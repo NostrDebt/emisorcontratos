@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soberanía Nostr | Emisor de Contratos</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --primary: #5828e5;
+            --secondary: #2e7d32;
+            --bg: #f0f2f5;
+            --text: #333;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            padding: 20px; 
+            background-color: var(--bg); 
+            color: var(--text);
+            margin: 0;
+        }
+
+        .card { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            max-width: 450px; 
+            margin: 20px auto; 
+        }
+
+        <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soberanía Nostr | Emisor de Contratos</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --primary: #5828e5;
+            --secondary: #2e7d32;
+            --bg: #f0f2f5;
+            --text: #333;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            padding: 20px; 
+            background-color: var(--bg); 
+            color: var(--text);
+            margin: 0;
+        }
+
+        .card { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            max-width: 450px; 
+            margin: 20px auto; 
+        }
+
+        h1 { color: var(--primary); margin-bottom: 5px; font-size: 2.2em; }
+        .subtitle { color: #666; font-size: 0.9em; margin-bottom: 25px; font-weight: 400; }
+
+        .data-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 15px 0;
+            border: 1px solid #eee;
+        }
+
+        .label { font-size: 0.75em; text-transform: uppercase; color: #888; letter-spacing: 1.2px; font-weight: 600; }
+        .value { font-size: 1.6em; font-weight: bold; color: var(--secondary); margin-top: 5px; }
+
+        .form-group { text-align: left; margin-top: 25px; }
+        label { display: block; font-size: 0.9em; margin-bottom: 8px; font-weight: 600; color: #444; }
+
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin-bottom: 18px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            font-size: 15px;
+        }
+
+        button { 
+            width: 100%;
+            padding: 15px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            font-weight: bold;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+
+        #btn-conectar { background: var(--primary); color: white; }
+        #btn-comprar { background: var(--secondary); color: white; }
+        button:hover { opacity: 0.9; }
+
+        /* Estilos del Certificado */
+        #certificado-container {
+            display: none; 
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            border: 4px double var(--primary);
+            max-width: 450px;
+            margin: 30px auto;
+            text-align: left;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+
+        #certificado-container h2 {
+            text-align: center;
+            color: var(--primary);
+            margin-top: 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .cert-field { margin-bottom: 12px; font-size: 0.95em; }
+        .cert-field strong { color: #555; }
+
+        #qrcode {
+            margin: 20px auto;
+            padding: 10px;
+            background: white;
+            border: 1px solid #eee;
+            width: 128px;
+            height: 128px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .event-id { 
+            font-family: monospace; 
+            font-size: 0.75em; 
+            word-break: break-all; 
+            background: #f4f4f4; 
+            padding: 10px; 
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+
+        .footer-note { font-size: 0.75em; color: #999; margin-top: 20px; line-height: 1.5; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Soberanía Nostr</h1>
+        <p class="subtitle">Protocolo de Inmutabilidad Financiera</p>
+
+        <div class="data-box">
+            <div class="label">Deuda actual por ciudadano</div>
+            <div id="deuda-valor" class="value">Cargando...</div>
+        </div>
+
+        <div class="data-box">
+            <div class="label">Próximo Contrato Disponible</div>
+            <div id="numero-contrato" class="value">#101</div>
+        </div>
+
+        <button id="btn-conectar">Consultar Precio</button>
+
+        <hr>
+
+        <div class="form-group">
+            <label for="user-name">Pseudónimo</label>
+            <input type="text" id="user-name" placeholder="Ej: soberano_01">
+
+            <label for="user-nsec">Tu Clave Privada (nsec)</label>
+            <input type="password" id="user-nsec" placeholder="nsec1...">
+        </div>
+
+        <button id="btn-comprar">Firmar y Emitir Contrato</button>
+
+        <p class="footer-note">
+            Al emitir este contrato, grabas en la red Nostr tu soberanía individual bajo el oráculo de deuda vigente.
+        </p>
+    </div>
+
+    <div id="certificado-container">
+        <h2>Certificado de Soberanía</h2>
+        <div class="cert-field"><strong>Contrato:</strong> <span id="cert-numero"></span></div>
+        <div class="cert-field"><strong>Soberano:</strong> <span id="cert-soberano"></span></div>
+        <div class="cert-field"><strong>npub:</strong> <span id="cert-npub"></span></div>
+        <div class="cert-field"><strong>Fecha:</strong> <span id="cert-timestamp"></span></div>
+        <div class="cert-field"><strong>Costo:</strong> <span id="cert-precio"></span> sats</div>
+        
+        <div id="qrcode"></div>
+        
+        <div class="cert-field">
+            <strong>ID de Verificación (Nostr):</strong>
+            <div id="cert-id-evento" class="event-id"></div>
+        </div>
+        
+        <p style="text-align: center; font-style: italic; font-size: 0.8em; margin-top: 20px;">
+            "Vires in Numeris - Grabado en Nostr"
+        </p>
+    </div>
+
+    <script src="dist/qrcode.min.js"></script>
+    <script defer src="dist/app.bundle.js"></script>
+</body>
+</html>

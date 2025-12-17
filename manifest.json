@@ -1,0 +1,18 @@
+{
+  "name": "Soberanía Nostr: Contratos de Inmutabilidad",
+  "short_name": "Soberanía",
+  "description": "Protocolo de soberanía individual y emisión de contratos inmutables sobre Nostr.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#5828e5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

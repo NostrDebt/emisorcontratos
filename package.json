@@ -1,0 +1,24 @@
+{
+  "name": "nostr-soberania",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@babel/cli": "^7.28.3",
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
+    "noble-secp256k1": "^1.2.14",
+    "nostr-tools": "^2.19.3"
+  },
+  "devDependencies": {
+    "babelify": "^10.0.0",
+    "browserify": "^17.0.1"
+  }
+}
