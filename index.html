@@ -3,81 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SatoshiNostr V 1.0 - Protocolo de Escasez</title>
+    <title>SatoshiNostr V 1.0 - Protocolo Génesis 500</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.min.js"></script>
     <style>
-        :root { --main-color: #00ff41; --bg-color: #0d0d0d; --panel-bg: #1a1a1a; }
+        :root { --main-color: #00ff41; --bg-color: #0d0d0d; --panel-bg: #1a1a1a; --gold: #f2a900; }
         body { font-family: 'Courier New', Courier, monospace; background-color: var(--bg-color); color: var(--main-color); display: flex; justify-content: center; padding: 20px; }
         .container { max-width: 650px; width: 100%; background: var(--panel-bg); padding: 30px; border: 2px solid var(--main-color); box-shadow: 0 0 20px rgba(0, 255, 65, 0.2); }
-        h1 { border-bottom: 2px solid var(--main-color); padding-bottom: 10px; text-align: center; }
-        .search-box { background: #000; padding: 20px; border: 1px dashed var(--main-color); margin-bottom: 20px; text-align: center; }
+        h1 { border-bottom: 2px solid var(--main-color); padding-bottom: 10px; text-align: center; text-transform: uppercase; letter-spacing: 2px; }
+        .search-box { background: #000; padding: 25px; border: 1px dashed var(--main-color); margin-bottom: 20px; text-align: center; }
         input, textarea { width: 100%; padding: 12px; margin-top: 10px; border: 1px solid var(--main-color); background: #000; color: var(--main-color); font-family: inherit; box-sizing: border-box; }
-        #statusMsg { margin: 15px 0; font-weight: bold; min-height: 40px; }
-        .btn { background: var(--main-color); color: #000; padding: 15px; width: 100%; border: none; font-weight: bold; cursor: pointer; font-size: 1.1em; margin-top: 10px; text-transform: uppercase; }
-        .btn:hover { background: #008f11; color: #fff; }
+        #statusMsg { margin: 15px 0; font-weight: bold; min-height: 50px; line-height: 1.4; }
+        .btn { background: var(--main-color); color: #000; padding: 15px; width: 100%; border: none; font-weight: bold; cursor: pointer; font-size: 1.1em; margin-top: 10px; text-transform: uppercase; transition: 0.3s; }
+        .btn:hover { background: #fff; color: #000; }
+        .price-tag { font-size: 1.6em; color: var(--gold); display: block; margin-top: 5px; }
+        .warning-box { font-size: 0.85em; color: #ff4141; border: 1px solid #ff4141; padding: 15px; margin-top: 20px; text-align: justify; line-height: 1.3; }
         #seccionContrato { display: none; border-top: 2px solid var(--main-color); margin-top: 20px; padding-top: 20px; }
-        .price-tag { font-size: 1.5em; color: #f2a900; }
+        .founder-badge { color: var(--gold); font-size: 0.9em; border: 1px solid var(--gold); padding: 2px 5px; display: inline-block; margin-bottom: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>SatoshiNostr GÉNESIS</h1>
-    <p style="text-align: center;">Protocolo de Redención de Deuda Estatal</p>
+    <h1>SatoshiNostr Protocol</h1>
+    <p style="text-align: center; font-size: 0.9em;">Emisor de Títulos de Propiedad Numérica V 1.0</p>
 
     <div class="search-box">
-        <label>¿QUÉ NÚMERO DESEAS POSEER?</label>
-        <input type="number" id="montoNumero" placeholder="Ej: 21, 1, 100, 5000...">
-        <button class="btn" id="btnVerificar">VERIFICAR VALOR DE MERCADO</button>
+        <label>CONSULTAR NÚMERO SOBERANO</label>
+        <input type="number" id="montoNumero" placeholder="Ej: 1, 21, 100, 500, 1000...">
+        <button class="btn" id="btnVerificar">Verificar Valor de Mercado</button>
         <div id="statusMsg"></div>
     </div>
 
     <div id="seccionContrato">
-        <h3>FIRMA DEL TÍTULO DE PROPIEDAD</h3>
-        <input type="text" id="nombre" placeholder="Tu Identidad Soberana">
-        <textarea id="proclama" rows="3" placeholder="Mensaje opcional para la red de Nostr..."></textarea>
-        <button class="btn" id="btnEmitir">CONFIRMAR PAGO Y EMITIR PDF</button>
+        <div class="founder-badge" id="badgeTipo">FUNDADOR GÉNESIS</div>
+        <h3>CONTRATO DE ADQUISICIÓN</h3>
+        <input type="text" id="nombre" placeholder="Nombre o Identidad Nostr (Firma)">
+        <textarea id="proclama" rows="3" placeholder="Proclama soberana opcional (Inmortalizada en el Título)"></textarea>
+        <button class="btn" id="btnEmitir">Sellar Propiedad y Generar PDF</button>
+        
+        <div class="warning-box">
+            <strong>⚠️ AVISO DE SOBERANÍA:</strong> La validez de este título reside en su firma digital en la red Nostr. Puedes comprobar en todo momento la validez de la firma en Nostr. La criptografía no falla. Las compraventas fuera del protocolo oficial carecen de garantía de redención para la V 2.0. <strong>Don’t trust, verify.</strong>
+        </div>
+    </div>
+
+    <div style="font-size: 0.7em; color: #444; margin-top: 20px; text-align: center;">
+        Inmutabilidad via OpenTimestamps | Redención de Deuda Estatal | Sin registro de IP
     </div>
 </div>
 
 <script>
-    // 1. LÓGICA DE PRECIOS EXPONENCIALES
+    // FÓRMULA DE ESCASEZ EXPONENCIAL (100 BTC a 1 sat en 500 números)
     function calcularPrecio(n) {
-        if (n < 1) return 1;
-        if (n > 100) return 1; // Fuera del rango Génesis, precio base
+        if (n < 1) return 0;
+        if (n > 500) return 1; 
         
-        // Curva decreciente: el #1 vale 100M sats, el #100 vale 1 sat
-        // Fórmula: Base * e^(-k * n)
-        const precioInicial = 100000000; 
-        const factorDecaimiento = 0.185;
-        let precio = Math.round(precioInicial * Math.exp(-factorDecaimiento * (n - 1)));
+        const precioInicial = 10000000000; // 100 BTC en Satoshis
+        const k = 0.046144; 
         
+        let precio = Math.round(precioInicial * Math.exp(-k * (n - 1)));
         return precio < 1 ? 1 : precio;
     }
 
-    // Base de datos simulada de números YA VENDIDOS
-    const ocupados = {"1": "Hal Finney", "21": "Satoshi"};
+    const ocupados = {"1": "Hal Finney", "21": "Satoshi Nakamoto"};
 
     document.addEventListener('DOMContentLoaded', () => {
         const btnVerificar = document.getElementById('btnVerificar');
+        const btnEmitir = document.getElementById('btnEmitir');
         const seccionContrato = document.getElementById('seccionContrato');
         const statusMsg = document.getElementById('statusMsg');
+        const badgeTipo = document.getElementById('badgeTipo');
 
         btnVerificar.addEventListener('click', () => {
             const num = parseInt(document.getElementById('montoNumero').value);
-            if (isNaN(num)) return alert("Introduce un número válido.");
+            if (isNaN(num) || num <= 0) {
+                alert("Por favor, introduce un número natural válido.");
+                return;
+            }
 
             const precio = calcularPrecio(num);
+            const btcValue = (precio / 100000000).toFixed(8);
             
             if (ocupados[num]) {
-                statusMsg.innerHTML = `<span style="color:#ff4141">ESTADO: OCUPADO por ${ocupados[num]}</span><br>
-                                       Puedes intentar una oferta de recompra vía Nostr.`;
+                statusMsg.innerHTML = `<span style="color:#ff4141">ESTADO: RESERVADO / OCUPADO</span><br>
+                                       Titular: ${ocupados[num]}<br>
+                                       <small>Solo disponible mediante oferta de recompra en Mercado Secundario.</small>`;
                 seccionContrato.style.display = 'none';
             } else {
+                badgeTipo.innerText = num <= 500 ? "NODO FUNDADOR GÉNESIS" : "INDIVIDUO SOBERANO";
+                badgeTipo.style.color = num <= 500 ? "#f2a900" : "#00ff41";
+                badgeTipo.style.borderColor = num <= 500 ? "#f2a900" : "#00ff41";
+
                 statusMsg.innerHTML = `<span style="color:#00ff41">ESTADO: DISPONIBLE</span><br>
-                                       VALOR DE REDENCIÓN: <span class="price-tag">${precio.toLocaleString()} SATS</span>`;
+                                       VALOR DE REDENCIÓN: <span class="price-tag">${precio.toLocaleString()} SATS</span>
+                                       <small style="color:#888">(${btcValue} BTC)</small>`;
                 seccionContrato.style.display = 'block';
-                // Guardamos el precio en el botón para el PDF
                 btnEmitir.dataset.precio = precio;
             }
         });
@@ -88,10 +107,13 @@
             const precio = btnEmitir.dataset.precio;
             const proclama = document.getElementById('proclama').value;
 
-            if (!nombre) return alert("Nombre obligatorio.");
+            if (!nombre) {
+                alert("La Identidad Soberana es obligatoria para firmar el título.");
+                return;
+            }
 
             const lightningAddress = "soaringprofessional681756@getalby.com";
-            const confirmacion = confirm(`ORDEN DE PAGO:\nNúmero: #${num}\nPrecio: ${precio} sats\n\n¿Has enviado los fondos a ${lightningAddress}?`);
+            const confirmacion = confirm(`ORDEN DE ADQUISICIÓN:\n\nNúmero: #${num}\nInversión: ${parseInt(precio).toLocaleString()} sats\n\n¿Confirmas que has enviado los fondos a ${lightningAddress}?`);
 
             if (confirmacion) {
                 generarPDF(nombre, num, precio, proclama);
@@ -102,19 +124,53 @@
     function generarPDF(nombre, numero, precio, proclama) {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
+
+        doc.setFillColor(15, 15, 15);
+        doc.rect(0, 0, 210, 297, 'F');
+        doc.setDrawColor(0, 255, 65);
+        doc.setLineWidth(1.5);
         doc.rect(10, 10, 190, 277);
+
+        doc.setTextColor(0, 255, 65);
         doc.setFont("courier", "bold");
-        doc.text("TÍTULO DE PROPIEDAD SOBERANA", 30, 40);
-        doc.setFontSize(16);
-        doc.text(`ACTIVO: # ${numero}`, 30, 60);
-        doc.text(`VALOR DE REDENCIÓN: ${precio} SATS`, 30, 75);
+        doc.setFontSize(22);
+        doc.text("TITULO DE PROPIEDAD NUMERICA", 30, 40);
+        doc.setFontSize(14);
+        doc.text("PROTOCOLO SATOSHINOSTR - V 1.0", 30, 50);
+        doc.line(30, 55, 180, 55);
+
+        doc.setFontSize(18);
+        doc.setTextColor(242, 169, 0); 
+        doc.text(`ACTIVO SOBERANO: # ${numero}`, 30, 75);
+        
+        doc.setTextColor(0, 255, 65);
         doc.setFontSize(12);
-        doc.text(`TITULAR: ${nombre.toUpperCase()}`, 30, 95);
-        if(proclama) doc.text(`PROCLAMA: "${proclama}"`, 30, 110);
-        doc.text("-----------------------------------------", 30, 150);
-        doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 30, 160);
-        doc.text("FIRMADO: SATOSHINOSTR ORACLE", 30, 190);
-        doc.save(`Soberania_${numero}.pdf`);
+        doc.text(`VALOR DE REDENCIÓN: ${parseInt(precio).toLocaleString()} SATOSHIS`, 30, 90);
+        doc.text(`TITULAR DEL DERECHO: ${nombre.toUpperCase()}`, 30, 105);
+        
+        if (proclama) {
+            doc.text("PROCLAMA SOBERANA:", 30, 125);
+            doc.setFont("courier", "italic");
+            const splitMsg = doc.splitTextToSize(`"${proclama}"`, 150);
+            doc.text(splitMsg, 35, 135);
+        }
+
+        let y = 200;
+        doc.setFont("courier", "normal");
+        doc.setFontSize(10);
+        doc.text("ESTE DOCUMENTO ES UN TITULO DE PROPIEDAD PRIVADA INMUTABLE.", 30, y);
+        doc.text("LA VALIDEZ RADICA EN LA FIRMA DEL ORACULO EN LA RED NOSTR.", 30, y + 5);
+        doc.text(`REGISTRO: ${new Date().toISOString()}`, 30, y + 15);
+        
+        doc.setFontSize(14);
+        doc.setFont("courier", "bold");
+        doc.text("FIRMADO: SATOSHINOSTR ORACLE", 30, y + 40);
+        
+        doc.setTextColor(20, 20, 20);
+        doc.setFontSize(60);
+        doc.text("S O B E R A N O", 40, 250, {angle: 45});
+
+        doc.save(`Soberania_Cert_#${numero}.pdf`);
     }
 </script>
 </body>
