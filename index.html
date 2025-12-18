@@ -3,36 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NostrDebt - Emisor de Contratos</title>
-    
-    <meta name="lightning" content="soaringprofessional1681756@getalby.com" />
-    
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <title>SatoshiNostr V 1.0 - Protocolo de Escasez</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.min.js"></script>
+    <style>
+        :root { --main-color: #00ff41; --bg-color: #0d0d0d; --panel-bg: #1a1a1a; }
+        body { font-family: 'Courier New', Courier, monospace; background-color: var(--bg-color); color: var(--main-color); display: flex; justify-content: center; padding: 20px; }
+        .container { max-width: 650px; width: 100%; background: var(--panel-bg); padding: 30px; border: 2px solid var(--main-color); box-shadow: 0 0 20px rgba(0, 255, 65, 0.2); }
+        h1 { border-bottom: 2px solid var(--main-color); padding-bottom: 10px; text-align: center; }
+        .search-box { background: #000; padding: 20px; border: 1px dashed var(--main-color); margin-bottom: 20px; text-align: center; }
+        input, textarea { width: 100%; padding: 12px; margin-top: 10px; border: 1px solid var(--main-color); background: #000; color: var(--main-color); font-family: inherit; box-sizing: border-box; }
+        #statusMsg { margin: 15px 0; font-weight: bold; min-height: 40px; }
+        .btn { background: var(--main-color); color: #000; padding: 15px; width: 100%; border: none; font-weight: bold; cursor: pointer; font-size: 1.1em; margin-top: 10px; text-transform: uppercase; }
+        .btn:hover { background: #008f11; color: #fff; }
+        #seccionContrato { display: none; border-top: 2px solid var(--main-color); margin-top: 20px; padding-top: 20px; }
+        .price-tag { font-size: 1.5em; color: #f2a900; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Protocolo de Redención de Deuda</h1>
-        <p>Emisión de certificados soberanos vía Nostr</p>
-        
-        <form id="contractForm">
-            <label for="nombre">Nombre del Firmante:</label>
-            <input type="text" id="nombre" placeholder="Tu nombre o alias" required>
-            
-            <label for="deuda">Concepto de la Deuda:</label>
-            <textarea id="deuda" placeholder="Ej: Deuda ilegítima del Estado" required></textarea>
-            
-            <div class="info-box">
-                <p><strong>Tasa de Emisión:</strong> 1 satoshi</p>
-                <p>Al hacer clic, se abrirá Alby para confirmar el pago y sellar el contrato en Nostr.</p>
-            </div>
 
-            <button type="button" id="btnEmitir">Pagar 1 sat y Emitir Certificado</button>
-        </form>
+<div class="container">
+    <h1>SatoshiNostr GÉNESIS</h1>
+    <p style="text-align: center;">Protocolo de Redención de Deuda Estatal</p>
 
-        <div id="status"></div>
+    <div class="search-box">
+        <label>¿QUÉ NÚMERO DESEAS POSEER?</label>
+        <input type="number" id="montoNumero" placeholder="Ej: 21, 1, 100, 5000...">
+        <button class="btn" id="btnVerificar">VERIFICAR VALOR DE MERCADO</button>
+        <div id="statusMsg"></div>
     </div>
 
-    <script src="src/app.js"></script>
+    <div id="seccionContrato">
+        <h3>FIRMA DEL TÍTULO DE PROPIEDAD</h3>
+        <input type="text" id="nombre" placeholder="Tu Identidad Soberana">
+        <textarea id="proclama" rows="3" placeholder="Mensaje opcional para la red de Nostr..."></textarea>
+        <button class="btn" id="btnEmitir">CONFIRMAR PAGO Y EMITIR PDF</button>
+    </div>
+</div>
+
+<script>
+    // 1. LÓGICA DE PRECIOS EXPONENCIALES
+    function calcularPrecio(n) {
+        if (n < 1) return 1;
+        if (n > 100) return 1; // Fuera del rango Génesis, precio base
+        
+        // Curva decreciente: el #1 vale 100M sats, el #100 vale 1 sat
+        // Fórmula: Base * e^(-k * n)
+        const precioInicial = 100000000; 
+        const factorDecaimiento = 0.185;
+        let precio = Math.round(precioInicial * Math.exp(-factorDecaimiento * (n - 1)));
+        
+        return precio < 1 ? 1 : precio;
+    }
+
+    // Base de datos simulada de números YA VENDIDOS
+    const ocupados = {"1": "Hal Finney", "21": "Satoshi"};
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnVerificar = document.getElementById('btnVerificar');
+        const seccionContrato = document.getElementById('seccionContrato');
+        const statusMsg = document.getElementById('statusMsg');
+
+        btnVerificar.addEventListener('click', () => {
+            const num = parseInt(document.getElementById('montoNumero').value);
+            if (isNaN(num)) return alert("Introduce un número válido.");
+
+            const precio = calcularPrecio(num);
+            
+            if (ocupados[num]) {
+                statusMsg.innerHTML = `<span style="color:#ff4141">ESTADO: OCUPADO por ${ocupados[num]}</span><br>
+                                       Puedes intentar una oferta de recompra vía Nostr.`;
+                seccionContrato.style.display = 'none';
+            } else {
+                statusMsg.innerHTML = `<span style="color:#00ff41">ESTADO: DISPONIBLE</span><br>
+                                       VALOR DE REDENCIÓN: <span class="price-tag">${precio.toLocaleString()} SATS</span>`;
+                seccionContrato.style.display = 'block';
+                // Guardamos el precio en el botón para el PDF
+                btnEmitir.dataset.precio = precio;
+            }
+        });
+
+        btnEmitir.addEventListener('click', () => {
+            const nombre = document.getElementById('nombre').value;
+            const num = document.getElementById('montoNumero').value;
+            const precio = btnEmitir.dataset.precio;
+            const proclama = document.getElementById('proclama').value;
+
+            if (!nombre) return alert("Nombre obligatorio.");
+
+            const lightningAddress = "soaringprofessional681756@getalby.com";
+            const confirmacion = confirm(`ORDEN DE PAGO:\nNúmero: #${num}\nPrecio: ${precio} sats\n\n¿Has enviado los fondos a ${lightningAddress}?`);
+
+            if (confirmacion) {
+                generarPDF(nombre, num, precio, proclama);
+            }
+        });
+    });
+
+    function generarPDF(nombre, numero, precio, proclama) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.rect(10, 10, 190, 277);
+        doc.setFont("courier", "bold");
+        doc.text("TÍTULO DE PROPIEDAD SOBERANA", 30, 40);
+        doc.setFontSize(16);
+        doc.text(`ACTIVO: # ${numero}`, 30, 60);
+        doc.text(`VALOR DE REDENCIÓN: ${precio} SATS`, 30, 75);
+        doc.setFontSize(12);
+        doc.text(`TITULAR: ${nombre.toUpperCase()}`, 30, 95);
+        if(proclama) doc.text(`PROCLAMA: "${proclama}"`, 30, 110);
+        doc.text("-----------------------------------------", 30, 150);
+        doc.text(`FECHA: ${new Date().toLocaleDateString()}`, 30, 160);
+        doc.text("FIRMADO: SATOSHINOSTR ORACLE", 30, 190);
+        doc.save(`Soberania_${numero}.pdf`);
+    }
+</script>
 </body>
 </html>
