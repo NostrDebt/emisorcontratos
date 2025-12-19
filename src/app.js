@@ -1,32 +1,33 @@
 /**
- * SATOSHINOSTR PROTOCOL V 1.0
- * Logic for Sovereign Debt Redemption
+ * SATOSHINOSTR PROTOCOL - Final Sovereign Logic
  */
 
 function generarContrato() {
-    // 1. Acceso a la instancia de jsPDF (Standard UMD version)
+    // 1. Inicializar PDF (Versión UMD compatible con tu script del index)
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // 2. Captura de datos de la UI
-    const numNodo = document.getElementById('numeroContrato').value;
-    const proclama = document.getElementById('proclama').value;
+    // 2. Capturar elementos EXACTOS de tu HTML
+    const inputNodo = document.getElementById('numeroContrato');
+    const inputProclama = document.getElementById('proclama');
+    
+    const numNodo = inputNodo.value;
+    const proclama = inputProclama.value;
     const fecha = new Date().toLocaleString();
 
-    // Validar que el número de nodo sea válido
-    if (numNodo < 1 || numNodo > 500 || !numNodo) {
-        alert("Please enter a valid Founder Node Number (1-500).");
+    // 3. Validación de seguridad
+    if (!numNodo || numNodo < 1 || numNodo > 500) {
+        alert("Please enter a valid Node Number (1-500).");
         return;
     }
 
-    // 3. Cálculo de la Curva de Escasez (Deflación Exponencial)
-    // Formula: f(n) = 100 * 0.954^(n-1)
+    // 4. Cálculo de la curva de escasez
     const precio = 100 * Math.pow(0.954, numNodo - 1);
 
-    // 4. Diseño del PDF (Estética Cypherpunk)
+    // 5. Generación estética del PDF
     doc.setFont("courier", "bold");
     doc.setFontSize(22);
-    doc.setTextColor(212, 175, 55); // Color Oro (#d4af37)
+    doc.setTextColor(212, 175, 55); 
     doc.text("SATOSHINOSTR", 105, 40, { align: "center" });
 
     doc.setFontSize(14);
@@ -36,7 +37,6 @@ function generarContrato() {
     doc.setLineWidth(0.5);
     doc.line(20, 55, 190, 55);
 
-    // Contenido Técnico
     doc.setFontSize(12);
     doc.setFont("courier", "normal");
     doc.text(`Founder Node Number: ${numNodo} / 500`, 20, 70);
@@ -44,10 +44,32 @@ function generarContrato() {
     doc.text(`Timestamp: ${fecha}`, 20, 90);
 
     doc.setFont("courier", "italic");
-    doc.text("Personal Proclamation of Independence:", 20, 110);
-    
-    // Ajuste automático de texto para la proclama
-    const textLines = doc.splitTextToSize(proclama || "No proclamation provided. Silence is also sovereignty.", 170);
+    doc.text("Proclamation of Independence:", 20, 110);
+    const textLines = doc.splitTextToSize(proclama || "No proclamation provided.", 170);
     doc.text(textLines, 20, 120);
 
-    // Pie de página (
+    doc.setFont("courier", "bold");
+    doc.setFontSize(10);
+    doc.text("Don't Trust. Verify.", 105, 260, { align: "center" });
+
+    // 6. Descarga inmediata
+    doc.save(`SatoshiNostr_Contract_${numNodo}.pdf`);
+}
+
+// Lógica para que el PRECIO se vea mientras escribes
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('numeroContrato');
+    const display = document.getElementById('precioDisplay');
+    
+    if(input && display) {
+        input.addEventListener('input', () => {
+            const n = input.value;
+            if (n >= 1 && n <= 500) {
+                const p = 100 * Math.pow(0.954, n - 1);
+                display.innerText = `Price: ${p.toFixed(8)} BTC`;
+            } else {
+                display.innerText = "Price: -- BTC";
+            }
+        });
+    }
+});
