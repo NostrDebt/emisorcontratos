@@ -5,51 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SatoshiNostr - Sovereign Debt Redemption Protocol</title>
     <style>
-        body {
-            background-color: #000;
-            color: #d4af37;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            border: 2px solid #d4af37;
-            padding: 40px;
-            border-radius: 10px;
-            text-align: center;
-            width: 450px;
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
-        }
+        body { background-color: #000; color: #d4af37; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { border: 2px solid #d4af37; padding: 40px; border-radius: 10px; text-align: center; width: 450px; box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); }
         h1 { font-size: 2rem; margin-bottom: 5px; letter-spacing: 3px; }
         p.subtitle { font-size: 0.8rem; margin-bottom: 30px; opacity: 0.8; }
         .input-group { margin-bottom: 20px; text-align: left; }
         label { display: block; margin-bottom: 10px; font-size: 0.9rem; text-align: center;}
-        input, textarea {
-            width: 100%;
-            background: #111;
-            border: 1px solid #d4af37;
-            color: #fff;
-            padding: 10px;
-            box-sizing: border-box;
-            border-radius: 5px;
-            text-align: center;
-        }
+        input, textarea { width: 100%; background: #111; border: 1px solid #d4af37; color: #fff; padding: 10px; box-sizing: border-box; border-radius: 5px; text-align: center; }
         textarea { height: 100px; resize: none; text-align: left; }
         .price { margin: 20px 0; color: #d4af37; font-weight: bold; }
-        .sign-button {
-            background-color: #d4af37;
-            color: #000;
-            border: none;
-            padding: 15px 30px;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            border-radius: 5px;
-            text-transform: uppercase;
-        }
+        .sign-button { background-color: #d4af37; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; width: 100%; border-radius: 5px; text-transform: uppercase; }
         .sign-button:hover { background-color: #f1c40f; }
     </style>
 </head>
@@ -61,4 +26,38 @@
 
     <div class="input-group">
         <label>Founder Node Number (1-500):</label>
-        <input type="number" id="nodeNumber" placeholder="
+        <input type="number" id="nodeNumber" placeholder="Ej: 22">
+    </div>
+
+    <div class="input-group">
+        <label>Your Proclamation of Independence:</label>
+        <textarea id="proclamation" placeholder="Write your sovereignty declaration here..."></textarea>
+    </div>
+
+    <p class="price">Price: -- BTC</p>
+
+    <button class="sign-button" id="issueContract">SIGN AND ISSUE CONTRACT</button>
+</div>
+
+<script>
+    document.getElementById('issueContract').addEventListener('click', function(e) {
+        e.preventDefault(); 
+        const nodeInput = document.getElementById('nodeNumber');
+        const nodeValue = parseInt(nodeInput.value);
+
+        if (nodeValue > 500) {
+            alert("🛡️ ¡PACIENCIA, SOBERANO!\n\nEl Protocolo está en fase GÉNESIS exclusiva para los 500 Nodos Fundadores.\n\nEl acceso para la 'Plebe' (nodos 501+) se habilitará cuando la seguridad esté sellada. ¡Mantente atento a Nostr!");
+            return;
+        }
+
+        if (!nodeValue || nodeValue < 1) {
+            alert("Por favor, introduce un número de nodo válido (1-500).");
+            return;
+        }
+
+        alert("Acceso validado para el Nodo Fundador #" + nodeValue);
+    });
+</script>
+
+</body>
+</html>
