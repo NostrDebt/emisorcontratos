@@ -27,7 +27,7 @@
 
     <div class="input-group">
         <label>Founder Node Number (1-500):</label>
-        <input type="number" id="nodeNumber" placeholder="Ej: 100">
+        <input type="number" id="nodeNumber" placeholder="Ej: 1">
     </div>
 
     <div class="input-group">
@@ -54,22 +54,25 @@
         let btcPrice, satsPrice;
 
         if (n <= 500) {
-            // Nueva constante b = 0.0322 para que el Nodo 100 ≈ 1 BTC y el Nodo 500 ≈ 1 SAT
-            const a = 25.0; // Valor base ajustado
-            const b = 0.0322;
+            // Curva para Nodo 1 = 100 BTC y Nodo 500 = 1 SAT
+            // Constante b calculada para decaimiento exacto en 500 pasos
+            const a = 100; 
+            const b = 0.046181;
             
-            // Calculamos el precio en BTC
             btcPrice = a * Math.exp(-b * (n - 1));
             
-            // Aseguramos que el mínimo absoluto sea 1 SAT (0.00000001 BTC)
-            if (btcPrice < 0.00000001) btcPrice = 0.00000001;
+            // Forzado de precisión para el nodo final
+            if (n === 500) btcPrice = 0.00000001;
             
             satsPrice = Math.round(btcPrice * 100000000);
             
             priceDisplay.innerHTML = `Price: ${btcPrice.toFixed(8)} BTC<br><small>(${satsPrice.toLocaleString()} SATS)</small>`;
             priceDisplay.style.color = "#d4af37";
         } else {
-            priceDisplay.innerHTML = `Price: 0.00000001 BTC<br><small>(1 SAT)</small>`;
+            // Nodos 501+ (Plebe): Precio informativo 1 SAT
+            btcPrice = 0.00000001;
+            satsPrice = 1;
+            priceDisplay.innerHTML = `Price: ${btcPrice.toFixed(8)} BTC<br><small>(1 SAT)</small>`;
             priceDisplay.style.color = "#888";
         }
     }
@@ -81,16 +84,16 @@
         const n = parseInt(nodeInput.value);
 
         if (n > 500) {
-            alert("🛡️ ¡PACIENCIA, SOBERANO!\n\nEl Protocolo está en fase GÉNESIS exclusiva para los 500 Nodos Fundadores.\n\nEl acceso para la 'Plebe' (501+) se habilitará tras sellar la seguridad. ¡Mantente atento a Nostr!");
+            alert("🛡️ ¡PACIENCIA, SOBERANO!\n\nEl Protocolo está en fase GÉNESIS exclusiva para los 500 Nodos Fundadores.\n\nTu turno llegará pronto. El acceso para la 'Plebe' (nodos 501+) se habilitará cuando la seguridad esté sellada. ¡Mantente atento a Nostr!");
             return;
         }
 
         if (!n || n < 1) {
-            alert("Introduce un número de nodo válido.");
+            alert("Introduce un número de nodo válido (1-500).");
             return;
         }
 
-        alert("Acceso validado para el Nodo Fundador #" + n);
+        alert("Acceso validado para el Nodo Fundador #" + n + "\n\nIniciando proceso de redención de deuda...");
     });
 </script>
 
