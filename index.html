@@ -1,106 +1,32 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SatoshiNostr - Emisor de Soberanía</title>
+    <title>SatoshiNostr - Sovereignty Issuer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
-        :root {
-            --gold: #d4af37;
-            --black: #0a0a0a;
-            --gray: #1a1a1a;
-        }
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: var(--black);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            background-color: var(--gray);
-            padding: 40px;
-            border-radius: 10px;
-            border: 1px solid var(--gold);
-            box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
-            max-width: 500px;
-            width: 100%;
-            text-align: center;
-        }
+        :root { --gold: #d4af37; --black: #0a0a0a; --gray: #1a1a1a; }
+        body { font-family: 'Courier New', Courier, monospace; background-color: var(--black); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { background-color: var(--gray); padding: 40px; border-radius: 10px; border: 1px solid var(--gold); box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); max-width: 500px; width: 100%; text-align: center; }
         h1 { color: var(--gold); margin-bottom: 10px; }
         .subtitle { font-size: 0.9em; margin-bottom: 30px; color: #888; }
-        input, textarea {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            background: #000;
-            border: 1px solid #444;
-            color: white;
-            border-radius: 5px;
-            box-sizing: border-box;
-        }
-        input:focus, textarea:focus { border-color: var(--gold); outline: none; }
-        button {
-            background-color: var(--gold);
-            color: black;
-            border: none;
-            padding: 15px 30px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 5px;
-            width: 100%;
-            margin-top: 20px;
-            transition: transform 0.2s;
-        }
-        button:hover { transform: scale(1.02); background-color: #f1c40f; }
-        .footer { margin-top: 30px; font-size: 0.7em; color: #555; }
+        input, textarea { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
+        button { background-color: var(--gold); color: black; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; border-radius: 5px; width: 100%; margin-top: 20px; }
         .warning { color: var(--gold); font-size: 0.8em; margin-top: 10px; }
     </style>
 </head>
 <body>
-
     <div class="container">
         <h1>SATOSHINOSTR</h1>
-        <div class="subtitle">Protocolo de Redención de Deuda V 1.0</div>
-        
-        <label>Número de Nodo Fundador (1-500):</label>
-        <input type="number" id="numeroContrato" min="1" max="500" placeholder="Ej: 21">
-        
-        <label>Tu Proclama de Independencia:</label>
-        <textarea id="proclama" rows="4" placeholder="Escribe aquí tu declaración de soberanía..."></textarea>
-        
-        <div id="precioDisplay" class="warning">Precio: -- BTC</div>
-        
-        <button onclick="generarContrato()">FIRMAR Y EMITIR CONTRATO</button>
-        
-        <div class="footer">
-            Don't Trust. Verify. <br>
-            Signed in Nostr Network.
-        </div>
+        <div class="subtitle">Sovereign Debt Redemption Protocol V 1.0</div>
+        <label>Founder Node Number (1-500):</label>
+        <input type="number" id="numeroContrato" min="1" max="500" placeholder="e.g. 21">
+        <label>Your Proclamation of Independence:</label>
+        <textarea id="proclama" rows="4" placeholder="Write your sovereignty declaration here..."></textarea>
+        <div id="precioDisplay" class="warning">Price: -- BTC</div>
+        <button onclick="generarContrato()">SIGN AND ISSUE CONTRACT</button>
     </div>
-
     <script src="src/app.js"></script>
-    <script>
-        // Lógica visual para mostrar el precio dinámico en la UI
-        const inputNum = document.getElementById('numeroContrato');
-        const precioDiv = document.getElementById('precioDisplay');
-
-        inputNum.addEventListener('input', () => {
-            const n = parseInt(inputNum.value);
-            if (n >= 1 && n <= 500) {
-                // Misma fórmula que en app.js para coherencia
-                const precio = 100 * Math.pow(0.954, n - 1);
-                precioDiv.innerText = `Precio: ${precio.toFixed(8)} BTC`;
-            } else {
-                precioDiv.innerText = "Precio: -- BTC";
-            }
-        });
-    </script>
 </body>
 </html>
