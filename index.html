@@ -1,32 +1,110 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SatoshiNostr - Sovereignty Issuer</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>SatoshiNostr - Sovereign Debt Redemption Protocol</title>
     <style>
-        :root { --gold: #d4af37; --black: #0a0a0a; --gray: #1a1a1a; }
-        body { font-family: 'Courier New', Courier, monospace; background-color: var(--black); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { background-color: var(--gray); padding: 40px; border-radius: 10px; border: 1px solid var(--gold); box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); max-width: 500px; width: 100%; text-align: center; }
-        h1 { color: var(--gold); margin-bottom: 10px; }
-        .subtitle { font-size: 0.9em; margin-bottom: 30px; color: #888; }
-        input, textarea { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
-        button { background-color: var(--gold); color: black; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; border-radius: 5px; width: 100%; margin-top: 20px; }
-        .warning { color: var(--gold); font-size: 0.8em; margin-top: 10px; }
+        body {
+            background-color: #000;
+            color: #d4af37;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            border: 2px solid #d4af37;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            width: 450px;
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+        }
+        h1 { font-size: 2rem; margin-bottom: 5px; letter-spacing: 3px; }
+        p.subtitle { font-size: 0.8rem; margin-bottom: 30px; opacity: 0.8; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        label { display: block; margin-bottom: 10px; font-size: 0.9rem; text-align: center;}
+        input, textarea {
+            width: 100%;
+            background: #111;
+            border: 1px solid #d4af37;
+            color: #fff;
+            padding: 10px;
+            box-sizing: border-box;
+            border-radius: 5px;
+            text-align: center;
+        }
+        textarea { height: 100px; resize: none; text-align: left; }
+        .price { margin: 20px 0; color: #d4af37; font-weight: bold; }
+        .sign-button {
+            background-color: #d4af37;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            border-radius: 5px;
+            text-transform: uppercase;
+        }
+        .sign-button:hover { background-color: #f1c40f; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>SATOSHINOSTR</h1>
-        <div class="subtitle">Sovereign Debt Redemption Protocol V 1.0</div>
+
+<div class="container">
+    <h1>SATOSHINOSTR</h1>
+    <p class="subtitle">Sovereign Debt Redemption Protocol V 1.0</p>
+
+    <div class="input-group">
         <label>Founder Node Number (1-500):</label>
-        <input type="number" id="numeroContrato" min="1" max="500" placeholder="e.g. 21">
-        <label>Your Proclamation of Independence:</label>
-        <textarea id="proclama" rows="4" placeholder="Write your sovereignty declaration here..."></textarea>
-        <div id="precioDisplay" class="warning">Price: -- BTC</div>
-        <button onclick="generarContrato()">SIGN AND ISSUE CONTRACT</button>
+        <input type="number" id="nodeNumber" placeholder="Ej: 22" min="1">
     </div>
-    <script src="src/app.js"></script>
+
+    <div class="input-group">
+        <label>Your Proclamation of Independence:</label>
+        <textarea id="proclamation" placeholder="Write your sovereignty declaration here..."></textarea>
+    </div>
+
+    <p class="price">Price: -- BTC</p>
+
+    <button class="sign-button" id="issueContract">SIGN AND ISSUE CONTRACT</button>
+</div>
+
+<script>
+    document.getElementById('issueContract').addEventListener('click', function() {
+        const nodeInput = document.getElementById('nodeNumber');
+        const nodeValue = parseInt(nodeInput.value);
+        const proclamation = document.getElementById('proclamation').value;
+
+        // 1. Validación de Rango de Fundadores (Lógica anti-plebe)
+        if (nodeValue > 500) {
+            alert("🛡️ ¡PACIENCIA, SOBERANO!\n\nEl Protocolo está en fase GÉNESIS exclusiva para los 500 Nodos Fundadores.\n\nEl acceso para la 'Plebe' (nodos 501+) se habilitará cuando la seguridad esté sellada. ¡Mantente atento a Nostr!");
+            return;
+        }
+
+        // 2. Validación de entrada vacía o inválida
+        if (!nodeValue || nodeValue < 1) {
+            alert("Por favor, introduce un número de nodo válido entre 1 y 500.");
+            return;
+        }
+
+        if (proclamation.trim() === "") {
+            alert("La Proclamación de Independencia no puede estar vacía.");
+            return;
+        }
+
+        // 3. Si pasa los filtros, se procede a la firma (Tu lógica de backend aquí)
+        console.log("Acceso concedido al Nodo Fundador:", nodeValue);
+        alert("Generando contrato para el Nodo Fundador #" + nodeValue + "...");
+        
+        // Aquí llamarías a tu función de emisión:
+        // emitirContrato(nodeValue, proclamation);
+    });
+</script>
+
 </body>
 </html>
