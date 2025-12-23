@@ -15,20 +15,22 @@
         }
         .gold-text { color: #d4af37; }
         .gold-border { border: 1px solid #d4af37; }
-        #node-selector { -webkit-appearance: none; appearance: none; z-index: 50; position: relative; }
+        #node-selector { appearance: none; -webkit-appearance: none; z-index: 50; }
+        /* Estilo para asegurar que el QR sea visible siempre */
+        #qrcode canvas, #qrcode img { margin: 0 auto; display: block; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
 
     <div class="max-w-xl w-full text-center space-y-6">
         <header>
-            <h1 class="text-3xl font-bold gold-text tracking-widest uppercase">SATOSHINOSTR</h1>
-            <p class="text-[10px] italic opacity-60 font-bold uppercase">Genesis Redención v1.2.8</p>
+            <h1 class="text-3xl font-bold gold-text tracking-widest uppercase text-shadow">SATOSHINOSTR</h1>
+            <p class="text-[10px] italic opacity-60 font-bold uppercase">Genesis Protocol v1.2.9</p>
         </header>
 
         <div class="bg-black/80 p-6 rounded gold-border shadow-2xl space-y-6 text-left">
-            <p class="text-xs leading-relaxed italic opacity-90">
-                "El Estado emite deuda usando tu identidad como colateral. Redime tu contrato de forma técnica y soberana."
+            <p class="text-xs leading-relaxed italic opacity-90 border-l-2 border-[#d4af37] pl-3">
+                "El Estado usa tu identidad como colateral de su deuda. Redime tu contrato de forma técnica."
             </p>
             
             <div class="grid grid-cols-2 gap-4 border-t border-stone-800 pt-4">
@@ -39,23 +41,27 @@
                 </div>
                 <div class="text-right">
                     <p class="text-[9px] font-bold uppercase gold-text">Costo Emisión:</p>
-                    <p id="current-price" class="text-xl font-mono">CALCULANDO...</p>
+                    <p id="current-price" class="text-xl font-mono">--</p>
                 </div>
             </div>
 
             <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded text-sm">
-                Firmar y Generar QR
+                Firmar Redención
             </button>
         </div>
 
         <div id="payment-area" class="hidden p-6 bg-white rounded shadow-2xl space-y-4">
-            <div id="qrcode" class="flex justify-center bg-white min-h-[200px]"></div>
-            <p class="text-[9px] text-black font-bold uppercase text-center">Escanea con tu billetera Lightning</p>
+            <div id="qrcode" class="flex justify-center bg-white min-h-[200px] items-center">
+                <span class="text-black text-xs font-bold animate-pulse">GENERANDO QR...</span>
+            </div>
+            <p class="text-[10px] text-black font-black uppercase text-center border-t border-gray-200 pt-2">
+                Pagar con Lightning Network
+            </p>
             <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all"></p>
         </div>
 
-        <footer class="text-[9px] opacity-40 uppercase tracking-tighter">
-            <p>Bitcoin Block Height: <span id="display-block">SYNCING...</span></p>
+        <footer class="text-[9px] opacity-40 uppercase tracking-widest">
+            <p>Bitcoin Block: <span id="display-block">...</span></p>
         </footer>
     </div>
 
@@ -74,9 +80,9 @@
             if (n > 500) { priceOut.innerText = "v2.0"; payBtn.disabled = true; return; }
             payBtn.disabled = false;
             
-            // Ajuste de precisión para que 500 = 1 sat
+            // Factor ajustado para que 499 y 500 cuesten 1 SAT
             const startPriceSats = 10000000000;
-            const decay = 0.046139; 
+            const decay = 0.046145; 
             const sats = Math.ceil(startPriceSats * Math.exp(-decay * (n - 1)));
             
             priceOut.innerText = sats >= 100000000 ? (sats / 100000000).toFixed(4) + " BTC" : sats.toLocaleString() + " SATS";
@@ -86,36 +92,42 @@
         payBtn.onclick = async () => {
             const amt = calculate();
             document.getElementById('payment-area').classList.remove('hidden');
-            qrDiv.innerHTML = "<p class='text-black text-xs font-bold mt-20'>CONECTANDO...</p>";
+            qrDiv.innerHTML = "<span class='text-black text-[10px] font-bold uppercase'>Conectando al Nodo...</span>";
             
             try {
                 const r = await fetch(`${API_URL}/payments`, {
                     method: 'POST',
                     headers: {'X-Api-Key': API_KEY, 'Content-Type': 'application/json'},
-                    body: JSON.stringify({out: false, amount: amt, memo: "Redemption Node #"+nodeInp.value, unit: "sat"})
+                    body: JSON.stringify({out: false, amount: amt, memo: "Node #"+nodeInp.value, unit: "sat"})
                 });
                 const d = await r.json();
                 
                 if(d.payment_request) {
                     qrDiv.innerHTML = ""; 
-                    // Pequeño retraso para asegurar renderizado en móvil
-                    setTimeout(() => {
-                        new QRCode(qrDiv, {
-                            text: d.payment_request,
-                            width: 200,
-                            height: 200,
-                            correctLevel : QRCode.CorrectLevel.M
-                        });
-                        document.getElementById('invoice-str').innerText = d.payment_request;
-                    }, 100);
+                    // Renderizado de QR forzado
+                    new QRCode(qrDiv, {
+                        text: d.payment_request,
+                        width: 200,
+                        height: 200,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.M
+                    });
+                    document.getElementById('invoice-str').innerText = d.payment_request;
                     
                     const timer = setInterval(async () => {
-                        const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
-                        const s = await sR.json();
-                        if(s.paid) { clearInterval(timer); alert("PAGO CONFIRMADO"); location.reload(); }
+                        try {
+                            const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
+                            const s = await sR.json();
+                            if(s.paid) { 
+                                clearInterval(timer); 
+                                alert("CONTRATO FIRMADO"); 
+                                location.reload(); 
+                            }
+                        } catch(e) {}
                     }, 3000);
                 }
-            } catch(e) { qrDiv.innerHTML = "<p class='text-red-600'>ERROR</p>"; }
+            } catch(e) { qrDiv.innerHTML = "<span class='text-red-600 font-bold uppercase'>Error de Red</span>"; }
         };
 
         nodeInp.oninput = calculate;
