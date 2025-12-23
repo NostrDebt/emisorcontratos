@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SatoshiNostr | Sovereign Debt</title>
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
     <style>
         body { 
             background: #050505 linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('fondo.jpg');
@@ -17,9 +15,7 @@
         }
         .gold-text { color: #d4af37; }
         .gold-border { border: 1px solid #d4af37; }
-        /* Asegura que el input sea clickeable en móviles */
-        #node-selector { -webkit-appearance: none; -moz-appearance: textfield; cursor: text; z-index: 50; position: relative; }
-        .bg-card { background-color: rgba(15, 15, 15, 0.9); }
+        #node-selector { -webkit-appearance: none; appearance: none; z-index: 50; position: relative; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
@@ -27,39 +23,39 @@
     <div class="max-w-xl w-full text-center space-y-6">
         <header>
             <h1 class="text-3xl font-bold gold-text tracking-widest uppercase">SATOSHINOSTR</h1>
-            <p class="text-[10px] italic opacity-60">Protocol v1.2.7 - Redención de Deuda</p>
+            <p class="text-[10px] italic opacity-60 font-bold uppercase">Genesis Redención v1.2.8</p>
         </header>
 
-        <div class="bg-card p-6 rounded gold-border shadow-2xl space-y-6 text-left">
-            <p class="text-xs leading-relaxed italic opacity-80">
-                "El Estado emite deuda usando tu identidad como colateral. Redime tu contrato aquí."
+        <div class="bg-black/80 p-6 rounded gold-border shadow-2xl space-y-6 text-left">
+            <p class="text-xs leading-relaxed italic opacity-90">
+                "El Estado emite deuda usando tu identidad como colateral. Redime tu contrato de forma técnica y soberana."
             </p>
             
             <div class="grid grid-cols-2 gap-4 border-t border-stone-800 pt-4">
                 <div>
                     <label class="text-[9px] font-bold uppercase gold-text block mb-1">Nodo (1-500):</label>
-                    <input type="number" id="node-selector" value="494" min="1" max="500"
-                        class="w-full bg-black border border-stone-600 p-2 text-xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
+                    <input type="number" id="node-selector" value="499" min="1" max="500"
+                        class="w-full bg-stone-900 border border-stone-600 p-2 text-xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
                 </div>
                 <div class="text-right">
-                    <p class="text-[9px] font-bold uppercase gold-text">Costo:</p>
+                    <p class="text-[9px] font-bold uppercase gold-text">Costo Emisión:</p>
                     <p id="current-price" class="text-xl font-mono">CALCULANDO...</p>
                 </div>
             </div>
 
             <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded text-sm">
-                Generar Redención de Nodo
+                Firmar y Generar QR
             </button>
         </div>
 
-        <div id="payment-area" class="hidden p-6 bg-white rounded-lg space-y-4 animate-in fade-in">
-            <div id="qrcode" class="flex justify-center bg-white p-2"></div>
-            <p class="text-[9px] text-black font-bold uppercase text-center">Escanea con Phoenix / BlueWallet / Strike</p>
-            <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center"></p>
+        <div id="payment-area" class="hidden p-6 bg-white rounded shadow-2xl space-y-4">
+            <div id="qrcode" class="flex justify-center bg-white min-h-[200px]"></div>
+            <p class="text-[9px] text-black font-bold uppercase text-center">Escanea con tu billetera Lightning</p>
+            <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all"></p>
         </div>
 
-        <footer class="text-[9px] opacity-40">
-            <p>Bitcoin Block Height: <span id="display-block">Cargando...</span></p>
+        <footer class="text-[9px] opacity-40 uppercase tracking-tighter">
+            <p>Bitcoin Block Height: <span id="display-block">SYNCING...</span></p>
         </footer>
     </div>
 
@@ -72,18 +68,15 @@
         const payBtn = document.getElementById('btn-pay');
         const qrDiv = document.getElementById('qrcode');
 
-        // Función de cálculo pura (sin depender de nada externo)
         function calculate() {
             let n = parseInt(nodeInp.value);
-            if (isNaN(n) || n < 1) n = 1;
-            if (n > 500) {
-                priceOut.innerText = "VER v2.0";
-                payBtn.disabled = true;
-                return 0;
-            }
+            if (isNaN(n) || n < 1) return;
+            if (n > 500) { priceOut.innerText = "v2.0"; payBtn.disabled = true; return; }
             payBtn.disabled = false;
-            const startPriceSats = 10000000000; // 100 BTC
-            const decay = 0.046139;
+            
+            // Ajuste de precisión para que 500 = 1 sat
+            const startPriceSats = 10000000000;
+            const decay = 0.046139; 
             const sats = Math.ceil(startPriceSats * Math.exp(-decay * (n - 1)));
             
             priceOut.innerText = sats >= 100000000 ? (sats / 100000000).toFixed(4) + " BTC" : sats.toLocaleString() + " SATS";
@@ -92,56 +85,43 @@
 
         payBtn.onclick = async () => {
             const amt = calculate();
-            if (amt === 0) return;
-
             document.getElementById('payment-area').classList.remove('hidden');
-            qrDiv.innerHTML = "<span class='text-black text-xs uppercase font-bold'>Conectando a Lightning...</span>";
+            qrDiv.innerHTML = "<p class='text-black text-xs font-bold mt-20'>CONECTANDO...</p>";
             
             try {
                 const r = await fetch(`${API_URL}/payments`, {
                     method: 'POST',
                     headers: {'X-Api-Key': API_KEY, 'Content-Type': 'application/json'},
-                    body: JSON.stringify({out: false, amount: amt, memo: "SatoshiNostr Node #"+nodeInp.value, unit: "sat"})
+                    body: JSON.stringify({out: false, amount: amt, memo: "Redemption Node #"+nodeInp.value, unit: "sat"})
                 });
                 const d = await r.json();
                 
                 if(d.payment_request) {
-                    qrDiv.innerHTML = "";
-                    // Verificamos si la librería QRCode cargó
-                    if (typeof QRCode !== "undefined") {
-                        new QRCode(qrDiv, {text: d.payment_request, width: 220, height: 220});
-                    } else {
-                        qrDiv.innerHTML = "<p class='text-red-600 text-[10px] uppercase'>Error: No cargó el motor QR. Copia el invoice abajo.</p>";
-                    }
-                    document.getElementById('invoice-str').innerText = d.payment_request;
+                    qrDiv.innerHTML = ""; 
+                    // Pequeño retraso para asegurar renderizado en móvil
+                    setTimeout(() => {
+                        new QRCode(qrDiv, {
+                            text: d.payment_request,
+                            width: 200,
+                            height: 200,
+                            correctLevel : QRCode.CorrectLevel.M
+                        });
+                        document.getElementById('invoice-str').innerText = d.payment_request;
+                    }, 100);
                     
                     const timer = setInterval(async () => {
-                        try {
-                            const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
-                            const s = await sR.json();
-                            if(s.paid) { 
-                                clearInterval(timer); 
-                                alert("PAGO CONFIRMADO. Generando Certificado..."); 
-                                location.reload(); 
-                            }
-                        } catch(e) {}
+                        const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
+                        const s = await sR.json();
+                        if(s.paid) { clearInterval(timer); alert("PAGO CONFIRMADO"); location.reload(); }
                     }, 3000);
                 }
-            } catch(e) { 
-                qrDiv.innerHTML = "<span class='text-red-600'>ERROR DE RED</span>";
-            }
+            } catch(e) { qrDiv.innerHTML = "<p class='text-red-600'>ERROR</p>"; }
         };
 
-        // Escuchadores de eventos mejorados para móvil
-        nodeInp.addEventListener('input', calculate);
-        nodeInp.addEventListener('change', calculate);
-
+        nodeInp.oninput = calculate;
         window.onload = () => {
             calculate();
-            fetch('https://mempool.space/api/blocks/tip/height')
-                .then(r => r.text())
-                .then(h => document.getElementById('display-block').innerText = h)
-                .catch(() => document.getElementById('display-block').innerText = "ONLINE");
+            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
         };
     </script>
 </body>
