@@ -16,7 +16,7 @@
         .gold-text { color: #d4af37; }
         .gold-border { border: 1px solid #d4af37; }
         .cypher-bg { background: rgba(10, 10, 10, 0.95); }
-        #node-selector { appearance: none; -webkit-appearance: none; }
+        #qrcode img, #qrcode canvas { margin: 0 auto; border: 8px solid white; padding: 5px; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
@@ -24,7 +24,7 @@
     <div class="max-w-xl w-full text-center space-y-6">
         <header>
             <h1 class="text-3xl font-bold gold-text tracking-[0.2em] uppercase">SATOSHINOSTR</h1>
-            <p class="text-[10px] italic opacity-60 font-bold">SOVEREIGN DEBT REDEMPTION PROTOCOL v1.3.0</p>
+            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.1</p>
         </header>
 
         <div class="py-2 border-y border-stone-800">
@@ -34,7 +34,7 @@
 
         <div class="cypher-bg p-6 rounded gold-border shadow-2xl space-y-6 text-left">
             <p class="text-xs leading-relaxed opacity-90 border-l-2 border-[#d4af37] pl-3">
-                "The State issues debt using your identity as collateral. <span class="gold-text">SatoshiNostr</span> is the technical tool to redeem that contract sovereignly."
+                "The State issues debt using your identity as collateral. <span class="gold-text">SatoshiNostr</span> is the technical tool to redeem that contract."
             </p>
             
             <div class="grid grid-cols-2 gap-4 border-t border-stone-800 pt-4">
@@ -45,12 +45,12 @@
                 </div>
                 <div class="text-right">
                     <p class="text-[9px] font-bold uppercase gold-text">Emission Cost:</p>
-                    <p id="current-price" class="text-xl font-mono">CALCULATING...</p>
+                    <p id="current-price" class="text-xl font-mono">--</p>
                 </div>
             </div>
 
             <div id="msg-limit" class="hidden bg-red-900/20 border border-red-900 p-3 text-[10px] text-red-400 font-bold uppercase">
-                Reserved for v2.0. We are in Founder Phase. Please select a number below 500.
+                Reserved for v2.0. We are in Founder Phase. Select a number < 500.
             </div>
 
             <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded text-sm tracking-widest">
@@ -59,11 +59,13 @@
         </div>
 
         <div id="payment-area" class="hidden p-6 bg-white rounded shadow-2xl space-y-4">
-            <div id="qrcode" class="flex justify-center bg-white min-h-[200px] items-center"></div>
+            <div id="qrcode" class="flex justify-center bg-white min-h-[220px] items-center text-black text-xs font-bold uppercase">
+                Initializing...
+            </div>
             <p class="text-[10px] text-black font-black uppercase text-center border-t border-gray-200 pt-2">
                 Scan with any Lightning Wallet
             </p>
-            <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all"></p>
+            <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all px-4"></p>
         </div>
 
         <footer class="text-[9px] opacity-40 uppercase tracking-widest">
@@ -80,119 +82,79 @@
         const priceOut = document.getElementById('current-price');
         const payBtn = document.getElementById('btn-pay');
         const qrDiv = document.getElementById('qrcode');
-        const limitMsg = document.getElementById('msg-limit');
 
         function calculate() {
             let n = parseInt(nodeInp.value);
             if (isNaN(n) || n < 1) return;
-            
             if (n > 500) {
                 priceOut.innerText = "LOCKED";
-                limitMsg.classList.remove('hidden');
+                document.getElementById('msg-limit').classList.remove('hidden');
                 payBtn.disabled = true;
-                payBtn.style.opacity = "0.3";
                 return 0;
             }
-
-            limitMsg.classList.add('hidden');
+            document.getElementById('msg-limit').classList.add('hidden');
             payBtn.disabled = false;
-            payBtn.style.opacity = "1";
-
-            const startPriceSats = 10000000000; // 100 BTC
+            const start = 10000000000;
             const decay = 0.046145; 
-            let sats = Math.ceil(startPriceSats * Math.exp(-decay * (n - 1)));
-            
-            if (n >= 499) sats = 1; // Floor price fix
-
-            priceOut.innerText = sats >= 100000000 ? (sats / 100000000).toFixed(4) + " BTC" : sats.toLocaleString() + " SATS";
+            let sats = Math.ceil(start * Math.exp(-decay * (n - 1)));
+            if (n >= 499) sats = 1;
+            priceOut.innerText = sats >= 100000000 ? (sats/100000000).toFixed(4)+" BTC" : sats.toLocaleString()+" SATS";
             return sats;
         }
 
-        async function generateSovereignPDF(nodeId) {
+        async function generatePDF(nodeId) {
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
+            const doc = new jsPDF();
             const block = document.getElementById('display-block').innerText;
-            const now = new Date().toUTCString();
-
-            // Background Cypherpunk
             doc.setFillColor(10, 10, 10);
             doc.rect(0, 0, 210, 297, 'F');
-            
-            // Frame
             doc.setDrawColor(212, 175, 55);
-            doc.setLineWidth(1.5);
             doc.rect(10, 10, 190, 277);
-
-            // Title
             doc.setTextColor(212, 175, 55);
-            doc.setFont("courier", "bold");
             doc.setFontSize(40);
-            doc.text("CERTIFICATE OF REDEMPTION", 105, 50, { align: "center" });
-            
-            doc.setFontSize(80);
-            doc.text(`NODE #${nodeId}`, 105, 100, { align: "center" });
-
-            doc.setFontSize(14);
-            doc.setTextColor(200, 200, 200);
-            doc.text("IDENTITY CONTRACT TERMINATED", 105, 130, { align: "center" });
-            
+            doc.text("SOVEREIGN REDEMPTION", 105, 50, { align: "center" });
+            doc.text(`#${nodeId}`, 105, 100, { align: "center" });
             doc.setFontSize(10);
-            doc.setFont("courier", "normal");
-            const manifesto = "This document proves the technical redemption of sovereign debt. The bearer has disconnected their identity as collateral for state-issued debt via SatoshiNostr Protocol.";
-            doc.text(doc.splitTextToSize(manifesto, 160), 105, 150, { align: "center" });
-
-            // Proof Metadata
-            doc.setDrawColor(40, 40, 40);
-            doc.line(30, 200, 180, 200);
-            
-            doc.setFontSize(8);
-            doc.setTextColor(100, 100, 100);
-            doc.text(`BITCOIN BLOCK HEIGHT: ${block}`, 105, 220, { align: "center" });
-            doc.text(`UTC TIMESTAMP: ${now}`, 105, 230, { align: "center" });
-            doc.text("VERIFIED VIA LIGHTNING NETWORK PROTOCOL", 105, 240, { align: "center" });
-
-            doc.save(`Sovereign_Node_${nodeId}.pdf`);
+            doc.text(`BLOCK: ${block} | ${new Date().toUTCString()}`, 105, 260, { align: "center" });
+            doc.save(`Node_${nodeId}.pdf`);
         }
 
         payBtn.onclick = async () => {
             const amt = calculate();
-            if (amt === 0) return;
             document.getElementById('payment-area').classList.remove('hidden');
-            qrDiv.innerHTML = "<span class='text-black text-[10px] font-bold animate-pulse'>CONNECTING...</span>";
-            
+            qrDiv.innerHTML = "CONNECTING TO NODE...";
+
             try {
                 const r = await fetch(`${API_URL}/payments`, {
                     method: 'POST',
                     headers: {'X-Api-Key': API_KEY, 'Content-Type': 'application/json'},
-                    body: JSON.stringify({out: false, amount: amt, memo: "Node #"+nodeInp.value, unit: "sat"})
+                    body: JSON.stringify({out: false, amount: amt, memo: "SatoshiNostr Node #"+nodeInp.value, unit: "sat"})
                 });
                 const d = await r.json();
                 
                 if(d.payment_request) {
-                    qrDiv.innerHTML = ""; 
-                    new QRCode(qrDiv, { text: d.payment_request, width: 200, height: 200 });
+                    qrDiv.innerHTML = "";
+                    // Usamos un try-catch interno para el QR
+                    try {
+                        new QRCode(qrDiv, { text: d.payment_request, width: 220, height: 220 });
+                    } catch(qrErr) {
+                        qrDiv.innerHTML = "QR GENERATION ERROR. USE INVOICE BELOW.";
+                    }
                     document.getElementById('invoice-str').innerText = d.payment_request;
                     
-                    const timer = setInterval(async () => {
-                        try {
-                            const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
-                            const s = await sR.json();
-                            if(s.paid) { 
-                                clearInterval(timer); 
-                                await generateSovereignPDF(nodeInp.value);
-                                location.reload(); 
-                            }
-                        } catch(e) {}
+                    const check = setInterval(async () => {
+                        const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
+                        const s = await sR.json();
+                        if(s.paid) { clearInterval(check); await generatePDF(nodeInp.value); location.reload(); }
                     }, 3000);
                 }
-            } catch(e) { qrDiv.innerHTML = "NETWORK ERROR"; }
+            } catch(e) { qrDiv.innerHTML = "LN NODE ERROR"; }
         };
 
         nodeInp.oninput = calculate;
         window.onload = () => {
             calculate();
-            const now = new Date().toUTCString();
-            document.getElementById('timestamp-ui').innerText = now;
+            document.getElementById('timestamp-ui').innerText = new Date().toUTCString();
             fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
         };
     </script>
