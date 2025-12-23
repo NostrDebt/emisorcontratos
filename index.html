@@ -3,116 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SatoshiNostr | Sovereign Debt Redemption</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <title>SatoshiNostr | Sovereign Debt</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <style>
         body { 
-            background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('fondo.jpg');
+            background: #050505 linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('fondo.jpg');
             background-size: cover; background-position: center; background-attachment: fixed;
             color: #e5e7eb; font-family: 'Courier New', monospace; 
         }
         .gold-text { color: #d4af37; }
         .gold-border { border: 1px solid #d4af37; }
-        input[type=number] { -moz-appearance: textfield; appearance: none; }
-        #qrcode img { margin: 0 auto; border: 10px solid white; padding: 5px; }
+        /* Asegura que el input sea clickeable en móviles */
+        #node-selector { -webkit-appearance: none; -moz-appearance: textfield; cursor: text; z-index: 50; position: relative; }
+        .bg-card { background-color: rgba(15, 15, 15, 0.9); }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
-    <div class="max-w-2xl w-full text-center space-y-6">
+
+    <div class="max-w-xl w-full text-center space-y-6">
         <header>
-            <h1 class="text-4xl font-bold gold-text tracking-widest uppercase">SATOSHINOSTR</h1>
-            <p class="text-xs italic opacity-70">Protocol v1.2.6 - Sovereign Genesis</p>
+            <h1 class="text-3xl font-bold gold-text tracking-widest uppercase">SATOSHINOSTR</h1>
+            <p class="text-[10px] italic opacity-60">Protocol v1.2.7 - Redención de Deuda</p>
         </header>
 
-        <div class="bg-black/80 p-6 rounded gold-border shadow-2xl space-y-6 text-left">
-            <p class="text-sm leading-relaxed italic">
-                El Estado emite deuda mediante un contrato tácito y usa tu identidad como colateral. SatoshiNostr es la herramienta para redimir ese contrato.
+        <div class="bg-card p-6 rounded gold-border shadow-2xl space-y-6 text-left">
+            <p class="text-xs leading-relaxed italic opacity-80">
+                "El Estado emite deuda usando tu identidad como colateral. Redime tu contrato aquí."
             </p>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-stone-800 pt-4">
+            <div class="grid grid-cols-2 gap-4 border-t border-stone-800 pt-4">
                 <div>
-                    <label class="text-[10px] font-bold uppercase gold-text block mb-1">Elegir Nodo (1-500):</label>
-                    <input type="number" id="node-selector" value="494" step="1"
-                        class="w-full bg-stone-900 border border-stone-600 p-3 text-2xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
+                    <label class="text-[9px] font-bold uppercase gold-text block mb-1">Nodo (1-500):</label>
+                    <input type="number" id="node-selector" value="494" min="1" max="500"
+                        class="w-full bg-black border border-stone-600 p-2 text-xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
                 </div>
                 <div class="text-right">
-                    <p class="text-[10px] font-bold uppercase gold-text">Costo de Emisión:</p>
-                    <p id="current-price" class="text-2xl font-mono">--</p>
+                    <p class="text-[9px] font-bold uppercase gold-text">Costo:</p>
+                    <p id="current-price" class="text-xl font-mono">CALCULANDO...</p>
                 </div>
             </div>
 
-            <div id="msg-limit" class="hidden text-[10px] text-red-500 font-bold uppercase">Solo disponible Fase Fundadores (1-500).</div>
-
-            <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded">
-                Firmar Redención
+            <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded text-sm">
+                Generar Redención de Nodo
             </button>
         </div>
 
-        <div id="payment-area" class="hidden p-6 bg-white rounded-lg space-y-4">
-            <div id="qrcode" class="flex justify-center"></div>
-            <p id="invoice-str" class="text-[8px] text-black break-all opacity-50 font-mono"></p>
+        <div id="payment-area" class="hidden p-6 bg-white rounded-lg space-y-4 animate-in fade-in">
+            <div id="qrcode" class="flex justify-center bg-white p-2"></div>
+            <p class="text-[9px] text-black font-bold uppercase text-center">Escanea con Phoenix / BlueWallet / Strike</p>
+            <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center"></p>
         </div>
 
-        <footer class="text-[10px] opacity-40">
-            <p>Bitcoin Block Height: <span id="display-block">---</span></p>
+        <footer class="text-[9px] opacity-40">
+            <p>Bitcoin Block Height: <span id="display-block">Cargando...</span></p>
         </footer>
     </div>
 
     <script>
         const API_KEY = "64f0b2f15f9d45e783664d9c490a074c";
         const API_URL = "https://demo.lnbits.com/api/v1";
+        
         const nodeInp = document.getElementById('node-selector');
         const priceOut = document.getElementById('current-price');
         const payBtn = document.getElementById('btn-pay');
+        const qrDiv = document.getElementById('qrcode');
 
-        function update() {
-            const n = parseInt(nodeInp.value);
-            if (n < 1 || n > 500) {
-                priceOut.innerText = "N/A";
-                document.getElementById('msg-limit').classList.remove('hidden');
+        // Función de cálculo pura (sin depender de nada externo)
+        function calculate() {
+            let n = parseInt(nodeInp.value);
+            if (isNaN(n) || n < 1) n = 1;
+            if (n > 500) {
+                priceOut.innerText = "VER v2.0";
                 payBtn.disabled = true;
-                return;
+                return 0;
             }
-            document.getElementById('msg-limit').classList.add('hidden');
             payBtn.disabled = false;
-            const sats = Math.ceil(10000000000 * Math.exp(-0.046139 * (n - 1)));
-            priceOut.innerText = sats >= 100000000 ? (sats/100000000).toFixed(4)+" BTC" : sats.toLocaleString()+" SATS";
+            const startPriceSats = 10000000000; // 100 BTC
+            const decay = 0.046139;
+            const sats = Math.ceil(startPriceSats * Math.exp(-decay * (n - 1)));
+            
+            priceOut.innerText = sats >= 100000000 ? (sats / 100000000).toFixed(4) + " BTC" : sats.toLocaleString() + " SATS";
+            return sats;
         }
 
         payBtn.onclick = async () => {
-            const n = parseInt(nodeInp.value);
-            const amt = Math.ceil(10000000000 * Math.exp(-0.046139 * (n - 1)));
+            const amt = calculate();
+            if (amt === 0) return;
+
             document.getElementById('payment-area').classList.remove('hidden');
-            document.getElementById('qrcode').innerHTML = "GENERANDO...";
+            qrDiv.innerHTML = "<span class='text-black text-xs uppercase font-bold'>Conectando a Lightning...</span>";
             
             try {
                 const r = await fetch(`${API_URL}/payments`, {
                     method: 'POST',
                     headers: {'X-Api-Key': API_KEY, 'Content-Type': 'application/json'},
-                    body: JSON.stringify({out: false, amount: amt, memo: "Node #"+n, unit: "sat"})
+                    body: JSON.stringify({out: false, amount: amt, memo: "SatoshiNostr Node #"+nodeInp.value, unit: "sat"})
                 });
                 const d = await r.json();
+                
                 if(d.payment_request) {
-                    document.getElementById('qrcode').innerHTML = "";
-                    new QRCode(document.getElementById('qrcode'), {text: d.payment_request, width: 200, height: 200});
+                    qrDiv.innerHTML = "";
+                    // Verificamos si la librería QRCode cargó
+                    if (typeof QRCode !== "undefined") {
+                        new QRCode(qrDiv, {text: d.payment_request, width: 220, height: 220});
+                    } else {
+                        qrDiv.innerHTML = "<p class='text-red-600 text-[10px] uppercase'>Error: No cargó el motor QR. Copia el invoice abajo.</p>";
+                    }
                     document.getElementById('invoice-str').innerText = d.payment_request;
                     
                     const timer = setInterval(async () => {
-                        const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
-                        const s = await sR.json();
-                        if(s.paid) { clearInterval(timer); alert("Soberanía confirmada"); location.reload(); }
+                        try {
+                            const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
+                            const s = await sR.json();
+                            if(s.paid) { 
+                                clearInterval(timer); 
+                                alert("PAGO CONFIRMADO. Generando Certificado..."); 
+                                location.reload(); 
+                            }
+                        } catch(e) {}
                     }, 3000);
                 }
-            } catch(e) { alert("Error de red"); }
+            } catch(e) { 
+                qrDiv.innerHTML = "<span class='text-red-600'>ERROR DE RED</span>";
+            }
         };
 
+        // Escuchadores de eventos mejorados para móvil
+        nodeInp.addEventListener('input', calculate);
+        nodeInp.addEventListener('change', calculate);
+
         window.onload = () => {
-            update();
-            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
+            calculate();
+            fetch('https://mempool.space/api/blocks/tip/height')
+                .then(r => r.text())
+                .then(h => document.getElementById('display-block').innerText = h)
+                .catch(() => document.getElementById('display-block').innerText = "ONLINE");
         };
-        nodeInp.oninput = update;
     </script>
 </body>
 </html>
