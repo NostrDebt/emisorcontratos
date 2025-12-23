@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SatoshiNostr | Sovereign Debt</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body { 
@@ -23,23 +22,23 @@
     <div class="max-w-xl w-full text-center space-y-6">
         <header>
             <h1 class="text-3xl font-bold gold-text tracking-[0.2em] uppercase">SATOSHINOSTR</h1>
-            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.3</p>
+            <p class="text-[10px] italic opacity-60 font-bold uppercase text-shadow">Sovereign Protocol v1.3.4</p>
         </header>
 
         <div class="py-2 border-y border-stone-800">
             <p class="text-[9px] uppercase tracking-widest gold-text opacity-70">Global Inventory Status</p>
-            <div id="inventory-count" class="text-2xl font-black italic">498 / 500 AVAILABLE</div>
+            <div id="inventory-count" class="text-2xl font-black italic">491 / 500 AVAILABLE</div>
         </div>
 
         <div class="cypher-bg p-6 rounded gold-border shadow-2xl space-y-6 text-left">
             <p class="text-xs leading-relaxed opacity-90 border-l-2 border-[#d4af37] pl-3">
-                "The State issues debt using your identity as collateral. <span class="gold-text font-bold">SatoshiNostr</span> is the technical tool to redeem that contract <span class="underline text-stone-400">through the ownership of a number</span>."
+                "The State issues debt using your identity as collateral. <span class="gold-text font-bold">SatoshiNostr</span> is the technical tool to redeem that contract <span class="underline text-stone-400 italic">through the ownership of a number</span>."
             </p>
             
             <div class="grid grid-cols-2 gap-4 border-t border-stone-800 pt-4">
                 <div>
                     <label class="text-[9px] font-bold uppercase gold-text block mb-1">Founder Node (1-500):</label>
-                    <input type="number" id="node-selector" value="494" min="1" max="1000"
+                    <input type="number" id="node-selector" value="492" min="1" max="1000"
                         class="w-full bg-black border border-stone-600 p-2 text-xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
                 </div>
                 <div class="text-right">
@@ -58,8 +57,9 @@
         </div>
 
         <div id="payment-area" class="hidden p-6 bg-white rounded shadow-2xl space-y-4">
-            <div id="status-msg" class="text-black text-[10px] font-bold uppercase text-center mb-2">Requesting Invoice...</div>
-            <div id="qrcode" class="flex justify-center bg-white min-h-[220px] items-center"></div>
+            <div id="status-msg" class="text-black text-[10px] font-bold uppercase text-center mb-2">Connecting to Sovereign Node...</div>
+            <div id="qrcode-container" class="flex justify-center bg-white min-h-[220px] items-center">
+                </div>
             <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all px-4"></p>
         </div>
 
@@ -70,14 +70,12 @@
     </div>
 
     <script>
-        // TU CLAVE VERIFICADA
         const API_KEY = "64f0b2f15f9d45e783664d9c490a074c";
         const API_URL = "https://demo.lnbits.com/api/v1";
         
         const nodeInp = document.getElementById('node-selector');
         const priceOut = document.getElementById('current-price');
         const payBtn = document.getElementById('btn-pay');
-        const qrDiv = document.getElementById('qrcode');
         const statusMsg = document.getElementById('status-msg');
 
         function calculate() {
@@ -107,20 +105,13 @@
 
             doc.setFillColor(5, 5, 5);
             doc.rect(0, 0, 210, 297, 'F');
-            doc.setDrawColor(212, 175, 55);
-            doc.setLineWidth(2);
+            doc.setDrawColor(212, 175, 55); doc.setLineWidth(2);
             doc.rect(10, 10, 190, 277);
-
-            doc.setTextColor(212, 175, 55);
-            doc.setFontSize(30);
+            doc.setTextColor(212, 175, 55); doc.setFontSize(30);
             doc.text("SOVEREIGN REDEMPTION", 105, 50, { align: "center" });
-            doc.setFontSize(70);
-            doc.text(`#${nodeId}`, 105, 110, { align: "center" });
-
-            doc.setFontSize(10);
-            doc.setTextColor(150, 150, 150);
+            doc.setFontSize(70); doc.text(`#${nodeId}`, 105, 110, { align: "center" });
+            doc.setFontSize(10); doc.setTextColor(150, 150, 150);
             doc.text("IDENTITY CONTRACT TERMINATED VIA SATOSHINOSTR PROTOCOL", 105, 140, { align: "center" });
-
             doc.setTextColor(100, 100, 100);
             doc.text(`BLOCK HEIGHT: ${block}`, 105, 250, { align: "center" });
             doc.text(`MEMPOOL UTC: ${time}`, 105, 260, { align: "center" });
@@ -130,69 +121,45 @@
         payBtn.onclick = async () => {
             const amt = calculate();
             document.getElementById('payment-area').classList.remove('hidden');
-            statusMsg.innerText = "1. Connecting to Lightning Node...";
-            qrDiv.innerHTML = "";
+            statusMsg.innerText = "Requesting Invoice...";
+            const qrContainer = document.getElementById('qrcode-container');
+            qrContainer.innerHTML = "";
 
             try {
-                const response = await fetch(`${API_URL}/payments`, {
+                // Usamos un modo no-cors o captura de error para el fetch
+                const r = await fetch(`${API_URL}/payments`, {
                     method: 'POST',
-                    headers: {
-                        'X-Api-Key': API_KEY, 
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        out: false, 
-                        amount: amt, 
-                        memo: "SatoshiNostr Node #"+nodeInp.value, 
-                        unit: "sat"
-                    })
+                    headers: {'X-Api-Key': API_KEY, 'Content-Type': 'application/json'},
+                    body: JSON.stringify({out: false, amount: amt, memo: "SatoshiNostr Node #"+nodeInp.value, unit: "sat"})
                 });
-
-                if (!response.ok) throw new Error('API Response Error');
+                const d = await r.json();
                 
-                const data = await response.json();
-                statusMsg.innerText = "2. Invoice Received. Generating QR...";
-
-                if(data.payment_request) {
-                    // Verificación de la librería de QR
-                    if (typeof QRCode === "undefined") {
-                        statusMsg.innerText = "Error: QR Library not loaded. Copy invoice manually.";
-                    } else {
-                        new QRCode(qrDiv, {
-                            text: data.payment_request,
-                            width: 220,
-                            height: 220,
-                            correctLevel: QRCode.CorrectLevel.M
-                        });
-                        statusMsg.innerText = "3. Awaiting Payment...";
-                    }
+                if(d.payment_request) {
+                    statusMsg.innerText = "Invoice Received. Scan QR:";
+                    // GENERACIÓN DE QR MEDIANTE API EXTERNA PARA EVITAR BLOQUEOS DE SCRIPT LOCAL
+                    qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${d.payment_request}" alt="QR" class="border-8 border-white">`;
+                    document.getElementById('invoice-str').innerText = d.payment_request;
                     
-                    document.getElementById('invoice-str').innerText = data.payment_request;
-                    
-                    const checkInterval = setInterval(async () => {
-                        const statusRes = await fetch(`${API_URL}/payments/${data.payment_hash}`, {
-                            headers: {'X-Api-Key': API_KEY}
-                        });
-                        const statusData = await statusRes.json();
-                        if(statusData.paid) { 
-                            clearInterval(checkInterval); 
-                            statusMsg.innerText = "4. PAID! Generating PDF...";
+                    const check = setInterval(async () => {
+                        const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
+                        const s = await sR.json();
+                        if(s.paid) { 
+                            clearInterval(check); 
+                            statusMsg.innerText = "PAID! REDEEMING...";
                             await generateSovereignPDF(nodeInp.value);
                             location.reload(); 
                         }
                     }, 3000);
                 }
             } catch(e) { 
-                statusMsg.innerText = "CONNECTION FAILED. CHECK KEY/NETWORK.";
+                statusMsg.innerText = "NETWORK BLOCK DETECTED. RETRYING...";
                 console.error(e);
             }
         };
 
         window.onload = () => {
             calculate();
-            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => {
-                document.getElementById('display-block').innerText = h;
-            });
+            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
             document.getElementById('mempool-time').innerText = new Date().toUTCString();
         };
         nodeInp.oninput = calculate;
