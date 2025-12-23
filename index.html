@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SatoshiNostr | Sovereign Debt Redemption</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -10,101 +10,109 @@
     <style>
         body { 
             background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('fondo.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            color: #e5e7eb; 
-            font-family: 'Courier New', monospace; 
+            background-size: cover; background-position: center; background-attachment: fixed;
+            color: #e5e7eb; font-family: 'Courier New', monospace; 
         }
         .gold-text { color: #d4af37; }
         .gold-border { border: 1px solid #d4af37; }
-        #qrcode img { margin: 0 auto; border: 12px solid white; padding: 10px; border-radius: 4px; }
-        .disabled-btn { background-color: #2a2a2a !important; color: #555 !important; cursor: not-allowed; }
+        input[type=number] { -moz-appearance: textfield; appearance: none; }
+        #qrcode img { margin: 0 auto; border: 10px solid white; padding: 5px; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
-
     <div class="max-w-2xl w-full text-center space-y-6">
         <header>
             <h1 class="text-4xl font-bold gold-text tracking-widest uppercase">SATOSHINOSTR</h1>
-            <p class="text-sm italic opacity-70 font-bold">Sovereign Debt Redemption Protocol v1.2.5</p>
+            <p class="text-xs italic opacity-70">Protocol v1.2.6 - Sovereign Genesis</p>
         </header>
 
-        <div class="bg-black/70 p-6 rounded gold-border shadow-2xl space-y-4 text-left">
-            <p class="text-sm leading-relaxed">
-                El Estado emite deuda mediante un contrato tácito y usa tu identidad como colateral. 
-                <span class="gold-text font-bold">SatoshiNostr</span> es la herramienta técnica para redimir ese contrato de forma fehaciente.
+        <div class="bg-black/80 p-6 rounded gold-border shadow-2xl space-y-6 text-left">
+            <p class="text-sm leading-relaxed italic">
+                El Estado emite deuda mediante un contrato tácito y usa tu identidad como colateral. SatoshiNostr es la herramienta para redimir ese contrato.
             </p>
             
-            <div class="flex flex-col md:flex-row gap-6 items-center justify-between border-t border-stone-800 pt-4">
-                <div class="w-full md:w-1/2">
-                    <label class="text-[10px] font-bold uppercase gold-text block mb-2">Nodo Fundador (1-500):</label>
-                    <input type="number" id="node-selector" value="494" 
-                        class="w-full bg-black border border-stone-700 p-3 text-2xl font-mono gold-text focus:outline-none focus:border-[#d4af37]">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-stone-800 pt-4">
+                <div>
+                    <label class="text-[10px] font-bold uppercase gold-text block mb-1">Elegir Nodo (1-500):</label>
+                    <input type="number" id="node-selector" value="494" step="1"
+                        class="w-full bg-stone-900 border border-stone-600 p-3 text-2xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
                 </div>
-                <div class="w-full md:w-1/2 text-right">
+                <div class="text-right">
                     <p class="text-[10px] font-bold uppercase gold-text">Costo de Emisión:</p>
                     <p id="current-price" class="text-2xl font-mono">--</p>
                 </div>
             </div>
 
-            <div id="msg-limit" class="hidden bg-red-900/30 border border-red-900 p-3 text-xs text-red-400 italic">
-                Aviso: El número seleccionado no está disponible. Estamos en **Fase de Fundadores (1-500)**. 
-                El inventario se abrirá a la ciudadanía en la **v2.0**.
-            </div>
+            <div id="msg-limit" class="hidden text-[10px] text-red-500 font-bold uppercase">Solo disponible Fase Fundadores (1-500).</div>
 
-            <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase tracking-tighter">
-                Firmar Redención de Nodo
+            <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded">
+                Firmar Redención
             </button>
         </div>
 
-        <div id="payment-area" class="hidden space-y-6 p-8 bg-black border-2 border-yellow-600 rounded-lg animate-fade-in">
-            <p class="text-xs gold-text uppercase font-bold text-center">Escanea con tu billetera Lightning:</p>
-            <div id="qrcode" class="flex justify-center min-h-[256px] items-center text-sm italic"></div>
-            <p id="invoice-str" class="text-[8px] break-all font-mono opacity-30 text-center mt-4 px-4"></p>
-            <div class="text-[10px] text-center font-bold text-yellow-500/50 animate-pulse uppercase">Esperando confirmación en la red...</div>
+        <div id="payment-area" class="hidden p-6 bg-white rounded-lg space-y-4">
+            <div id="qrcode" class="flex justify-center"></div>
+            <p id="invoice-str" class="text-[8px] text-black break-all opacity-50 font-mono"></p>
         </div>
 
         <footer class="text-[10px] opacity-40">
             <p>Bitcoin Block Height: <span id="display-block">---</span></p>
-            <p>Soberanía Cliente-Lado | Sin Bases de Datos | Protocolo Abierto</p>
         </footer>
     </div>
 
     <script>
-        // Tu Invoice Key de LNbits
-        const LNBITS_API_KEY = "64f0b2f15f9d45e783664d9c490a074c"; 
-        const LNBITS_URL = "https://demo.lnbits.com/api/v1";
-        
-        const nodeInput = document.getElementById('node-selector');
-        const priceDisplay = document.getElementById('current-price');
+        const API_KEY = "64f0b2f15f9d45e783664d9c490a074c";
+        const API_URL = "https://demo.lnbits.com/api/v1";
+        const nodeInp = document.getElementById('node-selector');
+        const priceOut = document.getElementById('current-price');
         const payBtn = document.getElementById('btn-pay');
-        const limitMsg = document.getElementById('msg-limit');
-        const qrDiv = document.getElementById('qrcode');
 
-        function updateUI() {
-            const n = parseInt(nodeInput.value);
-            if (n > 500 || n < 1) {
-                priceDisplay.innerText = "N/A";
-                payBtn.classList.add('disabled-btn');
+        function update() {
+            const n = parseInt(nodeInp.value);
+            if (n < 1 || n > 500) {
+                priceOut.innerText = "N/A";
+                document.getElementById('msg-limit').classList.remove('hidden');
                 payBtn.disabled = true;
-                limitMsg.classList.remove('hidden');
-            } else {
-                const startPriceSats = 10000000000; // 100 BTC
-                const decay = 0.046139;
-                const sats = Math.ceil(startPriceSats * Math.exp(-decay * (n - 1)));
-                
-                priceDisplay.innerText = sats >= 100000000 ? (sats / 100000000).toFixed(4) + " BTC" : sats.toLocaleString() + " SATS";
-                payBtn.classList.remove('disabled-btn');
-                payBtn.disabled = false;
-                limitMsg.classList.add('hidden');
+                return;
             }
+            document.getElementById('msg-limit').classList.add('hidden');
+            payBtn.disabled = false;
+            const sats = Math.ceil(10000000000 * Math.exp(-0.046139 * (n - 1)));
+            priceOut.innerText = sats >= 100000000 ? (sats/100000000).toFixed(4)+" BTC" : sats.toLocaleString()+" SATS";
         }
 
-        async function generatePDF(nodeId) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const block = document.getElementById('display-block').innerText;
-            doc.setFillColor(5, 5, 5);
-            doc.rect(0, 0, 210, 297, 'F');
-            doc.setDrawColor(212, 1
+        payBtn.onclick = async () => {
+            const n = parseInt(nodeInp.value);
+            const amt = Math.ceil(10000000000 * Math.exp(-0.046139 * (n - 1)));
+            document.getElementById('payment-area').classList.remove('hidden');
+            document.getElementById('qrcode').innerHTML = "GENERANDO...";
+            
+            try {
+                const r = await fetch(`${API_URL}/payments`, {
+                    method: 'POST',
+                    headers: {'X-Api-Key': API_KEY, 'Content-Type': 'application/json'},
+                    body: JSON.stringify({out: false, amount: amt, memo: "Node #"+n, unit: "sat"})
+                });
+                const d = await r.json();
+                if(d.payment_request) {
+                    document.getElementById('qrcode').innerHTML = "";
+                    new QRCode(document.getElementById('qrcode'), {text: d.payment_request, width: 200, height: 200});
+                    document.getElementById('invoice-str').innerText = d.payment_request;
+                    
+                    const timer = setInterval(async () => {
+                        const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
+                        const s = await sR.json();
+                        if(s.paid) { clearInterval(timer); alert("Soberanía confirmada"); location.reload(); }
+                    }, 3000);
+                }
+            } catch(e) { alert("Error de red"); }
+        };
+
+        window.onload = () => {
+            update();
+            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
+        };
+        nodeInp.oninput = update;
+    </script>
+</body>
+</html>
