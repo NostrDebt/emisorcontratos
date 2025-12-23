@@ -8,12 +8,17 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        @keyframes pulse-gold { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .fomo-pulse { animation: pulse-gold 2s infinite; }
-        body { background-color: #050505; color: #e5e7eb; font-family: 'Courier New', monospace; }
+        body { 
+            background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('fondo.jpg');
+            background-size: cover;
+            background-position: center;
+            color: #e5e7eb; 
+            font-family: 'Courier New', monospace; 
+        }
         .gold-text { color: #d4af37; }
         .gold-border { border: 1px solid #d4af37; }
         #qrcode img { margin: 0 auto; border: 8px solid white; padding: 5px; }
+        .disabled-btn { background-color: #2a2a2a !important; color: #555 !important; cursor: not-allowed; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
@@ -21,44 +26,45 @@
     <div class="max-w-2xl w-full text-center space-y-6">
         <header>
             <h1 class="text-4xl font-bold gold-text tracking-widest uppercase">SATOSHINOSTR</h1>
-            <p class="text-sm italic opacity-70">Protocol v1.2.1 - QR Engine Active</p>
+            <p class="text-sm italic opacity-70 font-bold">Sovereign Debt Redemption Protocol v1.2.4</p>
         </header>
 
-        <div class="py-4 border-y border-stone-800">
-            <p class="text-[10px] uppercase tracking-widest opacity-50">Nodos Registrados en la Red</p>
-            <div id="inventory-status" class="text-3xl font-bold gold-text uppercase tracking-tighter">SINCRONIZANDO...</div>
-        </div>
-
-        <div class="bg-stone-900/50 p-6 rounded gold-border shadow-2xl space-y-6 text-left">
-            <p class="text-sm opacity-80 italic">"El Estado usa tu identidad como colateral de su deuda. Tú eliges el número de tu redención."</p>
+        <div class="bg-black/60 p-6 rounded gold-border shadow-2xl space-y-4 text-left">
+            <p class="text-sm leading-relaxed">
+                El Estado emite deuda mediante un contrato tácito y usa tu identidad como colateral. 
+                <span class="gold-text">SatoshiNostr</span> es la herramienta técnica para redimir ese contrato de forma fehaciente.
+            </p>
             
-            <div class="flex flex-col md:flex-row gap-6 items-center justify-between">
+            <div class="flex flex-col md:flex-row gap-6 items-center justify-between border-t border-stone-800 pt-4">
                 <div class="w-full md:w-1/2">
-                    <label class="text-[10px] font-bold uppercase gold-text block mb-2">Elige tu Número de Nodo (1-500):</label>
-                    <input type="number" id="node-selector" min="1" max="500" value="494" 
+                    <label class="text-[10px] font-bold uppercase gold-text block mb-2">Nodo Fundador (1-500):</label>
+                    <input type="number" id="node-selector" value="494" 
                         class="w-full bg-black border border-stone-700 p-3 text-2xl font-mono gold-text focus:outline-none focus:border-[#d4af37]">
                 </div>
                 <div class="w-full md:w-1/2 text-right">
                     <p class="text-[10px] font-bold uppercase gold-text">Costo de Emisión:</p>
-                    <p id="current-price" class="text-3xl font-mono">-- sats</p>
+                    <p id="current-price" class="text-2xl font-mono">--</p>
                 </div>
             </div>
 
+            <div id="msg-limit" class="hidden bg-red-900/20 border border-red-900 p-3 text-xs text-red-400 italic">
+                El número seleccionado no está disponible. Estamos en **Fase de Fundadores (1-500)**. 
+                Se abrirá a la ciudadanía en la **v2.0**.
+            </div>
+
             <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase tracking-tighter">
-                Adquirir y Firmar Nodo Seleccionado
+                Firmar Redención de Nodo
             </button>
         </div>
 
-        <div id="payment-area" class="hidden space-y-6 p-8 bg-stone-900 border-2 border-yellow-600 rounded-lg animate-fade-in">
-            <p class="font-bold text-yellow-500 uppercase text-center">Escanea para activar tu nodo:</p>
-            <div id="qrcode" class="flex justify-center bg-transparent"></div>
-            <p id="invoice-str" class="text-[8px] break-all font-mono opacity-40 text-center px-4"></p>
-            <div class="text-xs text-center font-bold text-yellow-500/50 animate-pulse">ESPERANDO CONFIRMACIÓN...</div>
+        <div id="payment-area" class="hidden space-y-6 p-8 bg-stone-900 border-2 border-yellow-600 rounded-lg">
+            <div id="qrcode" class="flex justify-center"></div>
+            <p id="invoice-str" class="text-[8px] break-all font-mono opacity-40 text-center mt-4"></p>
         </div>
 
         <footer class="text-[10px] opacity-40">
-            <p>Bitcoin Block Height: <span id="display-block">---</span></p>
-            <p>Soberanía del lado del cliente - Zero Knowledge Backend</p>
+            <p>Bitcoin Block Height: <span id="display-block">929119+</span></p>
+            <p>Soberanía Cliente-Lado | Sin Bases de Datos | Protocolo Abierto</p>
         </footer>
     </div>
 
@@ -68,108 +74,53 @@
         
         const nodeInput = document.getElementById('node-selector');
         const priceDisplay = document.getElementById('current-price');
-        const qrContainer = document.getElementById('qrcode');
-        
-        function updatePrice() {
+        const payBtn = document.getElementById('btn-pay');
+        const limitMsg = document.getElementById('msg-limit');
+
+        function updateUI() {
             const n = parseInt(nodeInput.value);
-            if(n < 1 || n > 500) return 100;
-            const price = Math.ceil(100 * Math.exp(-0.046181 * (n - 1)));
-            priceDisplay.innerText = `${price} SATS`;
-            return price;
-        }
-
-        async function syncNetwork() {
-            try {
-                const r = await fetch(`${LNBITS_URL}/payments`, { headers: {"X-Api-Key": LNBITS_API_KEY} });
-                const payments = await r.json();
-                const totalSold = payments.filter(p => p.pending === false).length;
-                document.getElementById('inventory-status').innerText = `${totalSold} / 500 REGISTRADOS`;
-            } catch (e) {
-                document.getElementById('inventory-status').innerText = "RED ACTIVA";
+            if (n > 500 || n < 1) {
+                priceDisplay.innerText = "N/A";
+                payBtn.classList.add('disabled-btn');
+                payBtn.disabled = true;
+                limitMsg.classList.remove('hidden');
+            } else {
+                const startPriceSats = 10000000000; 
+                const decay = 0.046139;
+                const sats = Math.ceil(startPriceSats * Math.exp(-decay * (n - 1)));
+                priceDisplay.innerText = sats >= 100000000 ? (sats / 100000000).toFixed(4) + " BTC" : sats.toLocaleString() + " SATS";
+                payBtn.classList.remove('disabled-btn');
+                payBtn.disabled = false;
+                limitMsg.classList.add('hidden');
             }
-        }
-
-        async function generatePDF(nodeId) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const block = document.getElementById('display-block').innerText;
-
-            doc.setFillColor(5, 5, 5);
-            doc.rect(0, 0, 210, 297, 'F');
-            doc.setDrawColor(212, 175, 55);
-            doc.setLineWidth(1);
-            doc.rect(10, 10, 190, 277);
-            doc.rect(12, 12, 186, 273);
-            doc.setTextColor(212, 175, 55);
-            doc.setFont("courier", "bold");
-            doc.setFontSize(60);
-            doc.text(`#${nodeId}`, 105, 60, { align: "center" });
-            doc.setFontSize(22);
-            doc.text("Sovereignty Declared.", 105, 130, { align: "center" });
-            doc.setFontSize(10);
-            doc.text("Verified via Lightning Network Protocol", 105, 260, { align: "center" });
-            doc.setFontSize(9);
-            doc.setFont("courier", "italic");
-            doc.setTextColor(150, 150, 150);
-            doc.text(`Bitcoin Block Height: ${block}`, 105, 270, { align: "center" });
-            doc.save(`SatoshiNostr_Node_${nodeId}.pdf`);
         }
 
         document.getElementById('btn-pay').onclick = async () => {
             const selectedNode = nodeInput.value;
-            const price = updatePrice();
+            const price = Math.ceil(10000000000 * Math.exp(-0.046139 * (selectedNode - 1)));
             
             document.getElementById('payment-area').classList.remove('hidden');
-            qrContainer.innerHTML = ""; // Limpiar QR anterior
-            document.getElementById('invoice-str').innerText = "GENERANDO FACTURA...";
+            document.getElementById('qrcode').innerHTML = "";
 
             try {
                 const r = await fetch(`${LNBITS_URL}/payments`, {
                     method: "POST",
                     headers: {"X-Api-Key": LNBITS_API_KEY, "Content-Type": "application/json"},
-                    body: JSON.stringify({
-                        out: false, 
-                        amount: price, 
-                        memo: `SatoshiNostr Founder Node #${selectedNode}`,
-                        unit: "sat"
-                    })
+                    body: JSON.stringify({ out: false, amount: price, memo: `Founder Node #${selectedNode}`, unit: "sat" })
                 });
                 const data = await r.json();
-                
                 if(data.payment_request) {
+                    new QRCode(document.getElementById('qrcode'), { text: data.payment_request, width: 256, height: 256 });
                     document.getElementById('invoice-str').innerText = data.payment_request;
-                    new QRCode(qrContainer, {
-                        text: data.payment_request,
-                        width: 256,
-                        height: 256,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff"
-                    });
-
-                    const check = setInterval(async () => {
-                        const res = await fetch(`${LNBITS_URL}/payments/${data.payment_hash}`, {
-                            headers: {"X-Api-Key": LNBITS_API_KEY}
-                        });
-                        const status = await res.json();
-                        if (status.paid) {
-                            clearInterval(check);
-                            alert("PAGO VERIFICADO - GENERANDO CERTIFICADO");
-                            await generatePDF(selectedNode);
-                            location.reload();
-                        }
-                    }, 3000);
                 }
-            } catch (err) { alert("Error de conexión con Lightning"); }
+            } catch (e) { alert("Error de conexión"); }
         };
 
         window.onload = () => {
-            updatePrice();
-            syncNetwork();
-            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => {
-                document.getElementById('display-block').innerText = h;
-            });
+            updateUI();
+            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
         };
-        nodeInput.oninput = updatePrice;
+        nodeInput.oninput = updateUI;
     </script>
 </body>
 </html>
