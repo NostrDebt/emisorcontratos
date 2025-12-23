@@ -15,8 +15,8 @@
         }
         .gold-text { color: #d4af37; }
         .gold-border { border: 1px solid #d4af37; }
-        .cypher-bg { background: rgba(10, 10, 10, 0.95); }
-        #qrcode img, #qrcode canvas { margin: 0 auto; border: 8px solid white; padding: 5px; }
+        .cypher-bg { background: rgba(10, 10, 10, 0.98); }
+        #qrcode img { margin: 0 auto; border: 10px solid white; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
@@ -24,7 +24,7 @@
     <div class="max-w-xl w-full text-center space-y-6">
         <header>
             <h1 class="text-3xl font-bold gold-text tracking-[0.2em] uppercase">SATOSHINOSTR</h1>
-            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.1</p>
+            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.2</p>
         </header>
 
         <div class="py-2 border-y border-stone-800">
@@ -34,7 +34,7 @@
 
         <div class="cypher-bg p-6 rounded gold-border shadow-2xl space-y-6 text-left">
             <p class="text-xs leading-relaxed opacity-90 border-l-2 border-[#d4af37] pl-3">
-                "The State issues debt using your identity as collateral. <span class="gold-text">SatoshiNostr</span> is the technical tool to redeem that contract."
+                "The State issues debt using your identity as collateral. <span class="gold-text font-bold">SatoshiNostr</span> is the technical tool to redeem that contract <span class="underline">through the ownership of a number</span>."
             </p>
             
             <div class="grid grid-cols-2 gap-4 border-t border-stone-800 pt-4">
@@ -50,27 +50,24 @@
             </div>
 
             <div id="msg-limit" class="hidden bg-red-900/20 border border-red-900 p-3 text-[10px] text-red-400 font-bold uppercase">
-                Reserved for v2.0. We are in Founder Phase. Select a number < 500.
+                Reserved for v2.0. Founder Phase active. Select a number < 500.
             </div>
 
-            <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded text-sm tracking-widest">
+            <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded text-sm tracking-widest shadow-lg">
                 Sign & Redeem Node
             </button>
         </div>
 
         <div id="payment-area" class="hidden p-6 bg-white rounded shadow-2xl space-y-4">
-            <div id="qrcode" class="flex justify-center bg-white min-h-[220px] items-center text-black text-xs font-bold uppercase">
-                Initializing...
+            <div id="qrcode" class="flex justify-center bg-white min-h-[220px] items-center text-black text-[10px] font-bold uppercase">
+                Awaiting Node Response...
             </div>
-            <p class="text-[10px] text-black font-black uppercase text-center border-t border-gray-200 pt-2">
-                Scan with any Lightning Wallet
-            </p>
             <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all px-4"></p>
         </div>
 
-        <footer class="text-[9px] opacity-40 uppercase tracking-widest">
-            <p>Block Height: <span id="display-block">SYNCING...</span></p>
-            <p id="timestamp-ui"></p>
+        <footer class="text-[9px] opacity-40 uppercase tracking-widest space-y-1">
+            <p>Block Height: <span id="display-block">---</span></p>
+            <p>Mempool Time: <span id="mempool-time">---</span></p>
         </footer>
     </div>
 
@@ -85,7 +82,7 @@
 
         function calculate() {
             let n = parseInt(nodeInp.value);
-            if (isNaN(n) || n < 1) return;
+            if (isNaN(n) || n < 1) return 0;
             if (n > 500) {
                 priceOut.innerText = "LOCKED";
                 document.getElementById('msg-limit').classList.remove('hidden');
@@ -102,61 +99,73 @@
             return sats;
         }
 
-        async function generatePDF(nodeId) {
+        async function generateSovereignPDF(nodeId) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const block = document.getElementById('display-block').innerText;
-            doc.setFillColor(10, 10, 10);
+            const time = document.getElementById('mempool-time').innerText;
+
+            doc.setFillColor(5, 5, 5);
             doc.rect(0, 0, 210, 297, 'F');
             doc.setDrawColor(212, 175, 55);
+            doc.setLineWidth(2);
             doc.rect(10, 10, 190, 277);
+
             doc.setTextColor(212, 175, 55);
-            doc.setFontSize(40);
+            doc.setFontSize(35);
             doc.text("SOVEREIGN REDEMPTION", 105, 50, { align: "center" });
-            doc.text(`#${nodeId}`, 105, 100, { align: "center" });
+            doc.setFontSize(80);
+            doc.text(`#${nodeId}`, 105, 110, { align: "center" });
+
             doc.setFontSize(10);
-            doc.text(`BLOCK: ${block} | ${new Date().toUTCString()}`, 105, 260, { align: "center" });
-            doc.save(`Node_${nodeId}.pdf`);
+            doc.setTextColor(150, 150, 150);
+            const text = "This document certifies the technical termination of debt-identity collateralization through the SatoshiNostr Protocol.";
+            doc.text(doc.splitTextToSize(text, 150), 105, 140, { align: "center" });
+
+            doc.setTextColor(100, 100, 100);
+            doc.text(`BLOCK HEIGHT: ${block}`, 105, 250, { align: "center" });
+            doc.text(`MEMPOOL TIMESTAMP: ${time}`, 105, 260, { align: "center" });
+            doc.save(`SatoshiNostr_Node_${nodeId}.pdf`);
         }
 
         payBtn.onclick = async () => {
             const amt = calculate();
             document.getElementById('payment-area').classList.remove('hidden');
-            qrDiv.innerHTML = "CONNECTING TO NODE...";
+            qrDiv.innerHTML = "CONNECTING...";
 
             try {
                 const r = await fetch(`${API_URL}/payments`, {
                     method: 'POST',
                     headers: {'X-Api-Key': API_KEY, 'Content-Type': 'application/json'},
-                    body: JSON.stringify({out: false, amount: amt, memo: "SatoshiNostr Node #"+nodeInp.value, unit: "sat"})
+                    body: JSON.stringify({out: false, amount: amt, memo: "Node #"+nodeInp.value, unit: "sat"})
                 });
                 const d = await r.json();
                 
                 if(d.payment_request) {
                     qrDiv.innerHTML = "";
-                    // Usamos un try-catch interno para el QR
-                    try {
-                        new QRCode(qrDiv, { text: d.payment_request, width: 220, height: 220 });
-                    } catch(qrErr) {
-                        qrDiv.innerHTML = "QR GENERATION ERROR. USE INVOICE BELOW.";
-                    }
+                    new QRCode(qrDiv, { text: d.payment_request, width: 220, height: 220 });
                     document.getElementById('invoice-str').innerText = d.payment_request;
                     
                     const check = setInterval(async () => {
                         const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {headers: {'X-Api-Key': API_KEY}});
                         const s = await sR.json();
-                        if(s.paid) { clearInterval(check); await generatePDF(nodeInp.value); location.reload(); }
+                        if(s.paid) { clearInterval(check); await generateSovereignPDF(nodeInp.value); location.reload(); }
                     }, 3000);
                 }
-            } catch(e) { qrDiv.innerHTML = "LN NODE ERROR"; }
+            } catch(e) { qrDiv.innerHTML = "NODE OFFLINE"; }
         };
 
-        nodeInp.oninput = calculate;
         window.onload = () => {
             calculate();
-            document.getElementById('timestamp-ui').innerText = new Date().toUTCString();
-            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
+            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => {
+                document.getElementById('display-block').innerText = h;
+            });
+            // Fetch real Mempool Time
+            fetch('https://mempool.space/api/v1/fees/recommended').then(r => {
+                document.getElementById('mempool-time').innerText = new Date().toUTCString();
+            });
         };
+        nodeInp.oninput = calculate;
     </script>
 </body>
 </html>
