@@ -1,172 +1,170 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SatoshiNostr - Sovereign Debt Redemption Protocol</title>
+    <title>SatoshiNostr | Sovereign Debt Redemption</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #000; color: #d4af37; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { border: 2px solid #d4af37; padding: 40px; border-radius: 10px; text-align: center; width: 100%; max-width: 450px; box-shadow: 0 0 20px rgba(212, 175, 55, 0.2); }
-        h1 { font-size: 2rem; margin-bottom: 5px; letter-spacing: 3px; }
-        p.subtitle { font-size: 0.8rem; margin-bottom: 30px; opacity: 0.8; }
-        
-        /* Contador Estilo Terminal */
-        .counter { 
-            font-size: 1.1rem; margin-bottom: 25px; color: #d4af37; border: 1px solid #d4af37; 
-            padding: 15px; background: rgba(212, 175, 55, 0.05); width: 100%; box-sizing: border-box;
-        }
-        .counter span { color: #fff; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
-        .syncing { animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-
-        .input-group { margin-bottom: 20px; text-align: left; }
-        label { display: block; margin-bottom: 10px; font-size: 0.9rem; text-align: center;}
-        input, textarea { width: 100%; background: #111; border: 1px solid #d4af37; color: #fff; padding: 10px; box-sizing: border-box; border-radius: 5px; text-align: center; font-family: inherit; }
-        textarea { height: 100px; resize: none; text-align: left; }
-        
-        .price { margin: 20px 0; color: #d4af37; font-weight: bold; min-height: 3em; line-height: 1.4; font-size: 1.1rem; }
-        #statusMessage { margin: 10px 0; font-size: 0.8rem; letter-spacing: 2px; font-weight: bold; text-transform: uppercase; }
-        
-        .sign-button { background-color: #d4af37; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; width: 100%; border-radius: 5px; text-transform: uppercase; transition: 0.3s; margin-top: 10px; }
-        .sign-button:disabled { background-color: #444; color: #888; cursor: not-allowed; border: 1px solid #555; }
-        #qrContainer img { max-width: 200px; border: 10px solid #fff; margin-top: 20px; }
+        @keyframes pulse-gold { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .fomo-pulse { animation: pulse-gold 2s infinite; }
+        body { background-color: #050505; color: #e5e7eb; font-family: 'Courier New', monospace; }
+        .gold-text { color: #d4af37; }
+        .gold-border { border: 1px solid #d4af37; }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
 
-<div class="container">
-    <h1>SATOSHINOSTR</h1>
-    <p class="subtitle">Sovereign Debt Redemption Protocol V 1.0</p>
-    
-    <div class="counter" id="freeNodesCounter">
-        FREE FOUNDER NODES: <span class="syncing">SYNCING...</span>
+    <div class="max-w-2xl w-full text-center space-y-6">
+        <header>
+            <h1 class="text-4xl font-bold gold-text tracking-widest uppercase">SATOSHINOSTR</h1>
+            <p class="text-sm italic opacity-70">Protocol v1.2 - Manual Selection Enabled</p>
+        </header>
+
+        <div class="py-4 border-y border-stone-800">
+            <p class="text-[10px] uppercase tracking-widest opacity-50">Nodos Registrados en la Red</p>
+            <div id="inventory-status" class="text-3xl font-bold gold-text">SINCRONIZANDO...</div>
+        </div>
+
+        <div class="bg-stone-900/50 p-6 rounded gold-border shadow-2xl space-y-6 text-left">
+            <p class="text-sm opacity-80 italic">"El Estado usa tu identidad como colateral de su deuda. Tú eliges el número de tu redención."</p>
+            
+            <div class="flex flex-col md:flex-row gap-6 items-center justify-between">
+                <div class="w-full md:w-1/2">
+                    <label class="text-[10px] font-bold uppercase gold-text block mb-2">Elige tu Número de Nodo (1-500):</label>
+                    <input type="number" id="node-selector" min="1" max="500" value="494" 
+                        class="w-full bg-black border border-stone-700 p-3 text-2xl font-mono gold-text focus:outline-none focus:border-[#d4af37]">
+                </div>
+                <div class="w-full md:w-1/2 text-right">
+                    <p class="text-[10px] font-bold uppercase gold-text">Costo de Emisión:</p>
+                    <p id="current-price" class="text-3xl font-mono">-- sats</p>
+                </div>
+            </div>
+
+            <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase tracking-tighter">
+                Adquirir y Firmar Nodo Seleccionado
+            </button>
+        </div>
+
+        <div id="payment-area" class="hidden space-y-4 p-6 bg-white text-black rounded">
+            <p class="font-bold">VERIFICANDO DISPONIBILIDAD Y GENERANDO QR...</p>
+            <div id="qr-container" class="flex justify-center py-2">
+                <canvas id="qr-canvas"></canvas>
+            </div>
+            <p id="invoice-str" class="text-[8px] break-all font-mono opacity-60"></p>
+        </div>
+
+        <footer class="text-[10px] opacity-40">
+            <p>Bitcoin Block Height: <span id="display-block">---</span></p>
+            <p>Soberanía del lado del cliente - Sin base de datos centralizada</p>
+        </footer>
     </div>
 
-    <div class="input-group">
-        <label>Founder Node Number (1-500):</label>
-        <input type="number" id="nodeNumber" value="493" min="1" max="500">
-    </div>
-
-    <div class="input-group">
-        <label>Your Proclamation of Independence:</label>
-        <textarea id="proclamation" placeholder="Declare your sovereignty..."></textarea>
-    </div>
-
-    <div class="price" id="priceDisplay">Loading price...</div>
-    <div id="statusMessage">Checking availability...</div>
-
-    <button class="sign-button" id="issueContract">SIGN AND ISSUE CONTRACT</button>
-    
-    <div id="qrContainer"></div>
-</div>
-
-<script>
-    const nodeInput = document.getElementById('nodeNumber');
-    const priceDisplay = document.getElementById('priceDisplay');
-    const statusMsg = document.getElementById('statusMessage');
-    const signBtn = document.getElementById('issueContract');
-    const qrContainer = document.getElementById('qrContainer');
-    const counterDisplay = document.getElementById('freeNodesCounter');
-    
-    const invoiceKey = "eff83a8628e442b28c985dd9eb948c0f"; //
-    let occupiedNodes = [];
-
-    async function syncInventory() {
-        try {
-            const response = await fetch("https://demo.lnbits.com/api/v1/payments", {
-                headers: { "X-Api-Key": invoiceKey }
-            });
-            const payments = await response.json();
-            occupiedNodes = payments
-                .filter(p => !p.pending && p.amount > 0)
-                .map(p => {
-                    const match = p.memo.match(/Node #(\d+)/);
-                    return match ? parseInt(match[1]) : null;
-                }).filter(n => n !== null);
-
-            counterDisplay.innerHTML = `FREE FOUNDER NODES: <span>${500 - occupiedNodes.length}/500</span>`;
-            validateNode();
-        } catch (e) {
-            counterDisplay.innerHTML = `<span style="color:red">SYNC ERROR</span>`;
+    <script>
+        const LNBITS_API_KEY = "64f0b2f15f9d45e783664d9c490a074c"; 
+        const LNBITS_URL = "https://demo.lnbits.com/api/v1";
+        
+        const nodeInput = document.getElementById('node-selector');
+        const priceDisplay = document.getElementById('current-price');
+        
+        // 1. CÁLCULO DE PRECIO DINÁMICO SEGÚN NÚMERO ELEGIDO
+        function updatePrice() {
+            const n = parseInt(nodeInput.value);
+            if(n < 1 || n > 500) return;
+            // f(n) = 100 * e^(-0.046181 * (n-1))
+            const price = Math.ceil(100 * Math.exp(-0.046181 * (n - 1)));
+            priceDisplay.innerText = `${price} SATS`;
+            return price;
         }
-    }
 
-    function validateNode() {
-        const n = parseInt(nodeInput.value);
-        if (occupiedNodes.includes(n)) {
-            statusMsg.innerText = "NODE TAKEN - CHOOSE ANOTHER";
-            statusMsg.style.color = "#ff4444";
-            signBtn.disabled = true;
-        } else {
-            statusMsg.innerText = "NODE AVAILABLE";
-            statusMsg.style.color = "#00ff00";
-            signBtn.disabled = false;
-        }
-    }
-
-    function updatePrice() {
-        const n = parseInt(nodeInput.value);
-        if (!n || n < 1 || n > 500) return;
-        const a = 100, b = 0.046181;
-        let btcPrice = (n === 500) ? 0.00000001 : a * Math.exp(-b * (n - 1));
-        const satsPrice = Math.round(btcPrice * 100000000);
-        priceDisplay.innerHTML = `Price: ${btcPrice.toFixed(8)} BTC<br><small>(${satsPrice.toLocaleString()} SATS)</small>`;
-        validateNode();
-    }
-
-    function downloadCertificate(nodeNum, message) {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
-        doc.setFillColor(10, 10, 10); doc.rect(0, 0, 210, 297, 'F');
-        doc.setDrawColor(212, 175, 55); doc.setLineWidth(2); doc.rect(10, 10, 190, 277);
-        doc.setLineWidth(0.5); doc.rect(13, 13, 184, 271);
-        doc.setTextColor(212, 175, 55); doc.setFont("courier", "bold"); doc.setFontSize(35);
-        doc.text("SATOSHINOSTR", 105, 50, { align: "center" });
-        doc.setFontSize(60); doc.text(`#${nodeNum}`, 105, 120, { align: "center" });
-        doc.setTextColor(255, 255, 255); doc.setFontSize(14);
-        const splitText = doc.splitTextToSize(message || "Sovereignty Declared.", 150);
-        doc.text(splitText, 105, 160, { align: "center" });
-        doc.setTextColor(212, 175, 55); doc.setFontSize(10);
-        doc.text("Verified via Lightning Network Protocol", 105, 270, { align: "center" });
-        doc.save(`SatoshiNostr_Node_${nodeNum}.pdf`);
-    }
-
-    window.onload = () => { updatePrice(); syncInventory(); };
-    nodeInput.addEventListener('input', updatePrice);
-
-    signBtn.addEventListener('click', async () => {
-        const n = nodeInput.value;
-        const msg = document.getElementById('proclamation').value;
-        const btcPrice = (n == 500) ? 0.00000001 : 100 * Math.exp(-0.046181 * (n - 1));
-        const satsAmount = Math.round(btcPrice * 100000000);
-
-        qrContainer.innerHTML = "<p>Generating invoice...</p>";
-        try {
-            const res = await fetch("https://demo.lnbits.com/api/v1/payments", {
-                method: "POST",
-                headers: { "X-Api-Key": invoiceKey, "Content-Type": "application/json" },
-                body: JSON.stringify({ out: false, amount: satsAmount, memo: `Node #${n}`, unit: "sat" })
-            });
-            const data = await res.json();
-            if (data.payment_request) {
-                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${data.payment_request}`;
-                qrContainer.innerHTML = `<img src="${qrUrl}"><br><small style="color:#555">${data.payment_request}</small>`;
-                const checker = setInterval(async () => {
-                    const payRes = await fetch(`https://demo.lnbits.com/api/v1/payments/${data.checking_id}`, {
-                        headers: { "X-Api-Key": invoiceKey }
-                    });
-                    const payData = await payRes.json();
-                    if (payData.paid) {
-                        clearInterval(checker);
-                        qrContainer.innerHTML = "<h2 style='color:#00ff00'>PAID</h2>";
-                        downloadCertificate(n, msg);
-                        syncInventory();
-                    }
-                }, 2000);
+        // 2. SINCRONIZACIÓN DE RED
+        async function syncNetwork() {
+            try {
+                const r = await fetch(`${LNBITS_URL}/payments`, { headers: {"X-Api-Key": LNBITS_API_KEY} });
+                const payments = await r.json();
+                const totalSold = payments.filter(p => p.pending === false).length;
+                document.getElementById('inventory-status').innerText = `${totalSold} / 500 REGISTRADOS`;
+            } catch (e) {
+                document.getElementById('inventory-status').innerText = "MODO LOCAL (OFFLINE SYNC)";
             }
-        } catch (e) { qrContainer.innerHTML = "<p style='color:red'>Connection Error</p>"; }
-    });
-</script>
+        }
+
+        // 3. GENERACIÓN DE PDF
+        async function generatePDF(nodeId) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const r = await fetch('https://mempool.space/api/blocks/tip/height');
+            const block = await r.text();
+
+            doc.setFillColor(5, 5, 5);
+            doc.rect(0, 0, 210, 297, 'F');
+            doc.setDrawColor(212, 175, 55);
+            doc.setLineWidth(1);
+            doc.rect(10, 10, 190, 277);
+            doc.rect(12, 12, 186, 273);
+
+            doc.setTextColor(212, 175, 55);
+            doc.setFont("courier", "bold");
+            doc.setFontSize(60);
+            doc.text(`#${nodeId}`, 105, 60, { align: "center" });
+
+            doc.setFontSize(22);
+            doc.text("Sovereignty Declared.", 105, 130, { align: "center" });
+            
+            doc.setFontSize(10);
+            doc.text("Verified via Lightning Network Protocol", 105, 260, { align: "center" });
+            doc.setFontSize(9);
+            doc.setFont("courier", "italic");
+            doc.setTextColor(150, 150, 150);
+            doc.text(`Bitcoin Block Height: ${block}`, 105, 270, { align: "center" });
+            
+            doc.save(`SatoshiNostr_Node_${nodeId}.pdf`);
+        }
+
+        // 4. PROCESO DE PAGO
+        document.getElementById('btn-pay').onclick = async () => {
+            const selectedNode = nodeInput.value;
+            const price = updatePrice();
+            
+            document.getElementById('payment-area').classList.remove('hidden');
+            
+            try {
+                const r = await fetch(`${LNBITS_URL}/payments`, {
+                    method: "POST",
+                    headers: {"X-Api-Key": LNBITS_API_KEY, "Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        out: false, 
+                        amount: price, 
+                        memo: `Founder Node #${selectedNode}`
+                    })
+                });
+                const data = await r.json();
+                document.getElementById('invoice-str').innerText = data.payment_request;
+
+                const check = setInterval(async () => {
+                    const res = await fetch(`${LNBITS_URL}/payments/${data.payment_hash}`, {
+                        headers: {"X-Api-Key": LNBITS_API_KEY}
+                    });
+                    const status = await res.json();
+                    if (status.paid) {
+                        clearInterval(check);
+                        await generatePDF(selectedNode);
+                        location.reload();
+                    }
+                }, 3000);
+            } catch (err) { alert("Error de conexión con LNbits"); }
+        };
+
+        // Eventos
+        nodeInput.oninput = updatePrice;
+        window.onload = () => {
+            updatePrice();
+            syncNetwork();
+            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => {
+                document.getElementById('display-block').innerText = h;
+            });
+        };
+    </script>
 </body>
 </html>
