@@ -22,7 +22,7 @@
     <div class="max-w-xl w-full space-y-6">
         <header>
             <h1 class="text-3xl font-bold gold-text tracking-[0.2em] uppercase">SATOSHINOSTR</h1>
-            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.9</p>
+            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.11</p>
         </header>
 
         <div class="py-2 border-y border-stone-800">
@@ -53,8 +53,9 @@
         </div>
 
         <div id="payment-area" class="hidden p-6 bg-white rounded shadow-2xl space-y-4">
-            <div id="status-msg" class="text-black text-[10px] font-black uppercase text-center mb-2">Engaging Lightning...</div>
+            <div id="status-msg" class="text-black text-[10px] font-black uppercase text-center mb-2 font-bold">Iniciando Protocolo...</div>
             <div id="qrcode-container" class="flex justify-center bg-white min-h-[220px] items-center"></div>
+            <div id="error-console" class="hidden text-[8px] text-red-600 font-mono text-left bg-red-50 p-2 border border-red-200"></div>
             <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all px-4"></p>
         </div>
 
@@ -65,14 +66,16 @@
     </div>
 
     <script>
-        // Directriz 5: LNbits Integration (Direct Connection)
-        const API_URL = "https://demo.lnbits.com/api/v1"; 
-        const API_KEY = "64f0b2f15f9d45e783664d9c490a074c"; 
-        
+        const API_KEY = "64f0b2f15f9d45e783664d9c490a074c";
+        const API_URL = "https://demo.lnbits.com/api/v1";
+        // Usamos AllOrigins para saltar el muro CORS con más transparencia
+        const PROXY_URL = "https://api.allorigins.win/raw?url=";
+
         const nodeInp = document.getElementById('node-selector');
         const priceOut = document.getElementById('current-price');
         const payBtn = document.getElementById('btn-pay');
         const statusMsg = document.getElementById('status-msg');
+        const errCons = document.getElementById('error-console');
 
         function calculate() {
             let n = parseInt(nodeInp.value);
@@ -88,61 +91,57 @@
         async function generateSovereignPDF(nodeId) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const block = document.getElementById('display-block').innerText;
-            const time = document.getElementById('mempool-time').innerText;
             doc.setFillColor(5, 5, 5); doc.rect(0, 0, 210, 297, 'F');
             doc.setDrawColor(212, 175, 55); doc.setLineWidth(2); doc.rect(10, 10, 190, 277);
             doc.setTextColor(212, 175, 55); doc.setFontSize(30);
             doc.text("SOVEREIGN REDEMPTION", 105, 50, { align: "center" });
             doc.setFontSize(70); doc.text(`#${nodeId}`, 105, 110, { align: "center" });
-            doc.setFontSize(10); doc.setTextColor(150, 150, 150);
-            doc.text("IDENTITY CONTRACT TERMINATED VIA SATOSHINOSTR PROTOCOL", 105, 140, { align: "center" });
-            doc.text(`BLOCK: ${block} | UTC: ${time}`, 105, 260, { align: "center" });
             doc.save(`Sovereign_Node_${nodeId}.pdf`);
         }
 
         payBtn.onclick = async () => {
             const amt = calculate();
             document.getElementById('payment-area').classList.remove('hidden');
-            statusMsg.innerText = "GENERATING INVOICE...";
-            const qrContainer = document.getElementById('qrcode-container');
-            qrContainer.innerHTML = "";
+            errCons.classList.add('hidden');
+            statusMsg.innerText = "BYPASSING CROSS-ORIGIN WALL...";
+
+            const targetUrl = `${API_URL}/payments`;
+            const bodyData = {out: false, amount: amt, memo: "Node #"+nodeInp.value, unit: "sat"};
 
             try {
-                const r = await fetch(`${API_URL}/payments`, {
+                // El Proxy envuelve la petición para que el navegador crea que es local
+                const response = await fetch(PROXY_URL + encodeURIComponent(targetUrl), {
                     method: 'POST',
                     headers: { 
                         'X-Api-Key': API_KEY,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({out: false, amount: amt, memo: "Node #"+nodeInp.value, unit: "sat"})
+                    body: JSON.stringify(bodyData)
                 });
 
-                if (!r.ok) throw new Error("NETWORK_OR_AUTH_ERROR");
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.detail || data.error || "Error de Autenticación");
+                }
                 
-                const d = await r.json();
-                if(d.payment_request) {
-                    statusMsg.innerText = "INVOICE READY. SCAN TO REDEEM:";
-                    qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${d.payment_request}" alt="QR" class="border-4 border-black">`;
-                    document.getElementById('invoice-str').innerText = d.payment_request;
+                if(data.payment_request) {
+                    statusMsg.innerText = "SUCCESS! SCAN QR:";
+                    document.getElementById('qrcode-container').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${data.payment_request}" class="border-4 border-black">`;
+                    document.getElementById('invoice-str').innerText = data.payment_request;
                     
                     const check = setInterval(async () => {
-                        try {
-                            const sR = await fetch(`${API_URL}/payments/${d.payment_hash}`, {
-                                headers: {'X-Api-Key': API_KEY}
-                            });
-                            const s = await sR.json();
-                            if(s.paid) { 
-                                clearInterval(check); 
-                                statusMsg.innerText = "PAID! DOWNLOADING CERTIFICATE...";
-                                await generateSovereignPDF(nodeInp.value);
-                                location.reload(); 
-                            }
-                        } catch(e) {}
+                        const sR = await fetch(PROXY_URL + encodeURIComponent(`${API_URL}/payments/${data.payment_hash}`), {
+                            headers: {'X-Api-Key': API_KEY}
+                        });
+                        const s = await sR.json();
+                        if(s.paid) { clearInterval(check); await generateSovereignPDF(nodeInp.value); location.reload(); }
                     }, 3000);
                 }
             } catch(e) { 
-                statusMsg.innerText = "CONNECTION BLOCKED. USE DESKTOP OR VPN.";
+                statusMsg.innerText = "PROTOCOL ERROR";
+                errCons.innerText = "DIAGNOSIS: " + e.message + "\nTIP: Si el error persiste, la API de Demo está rechazando conexiones externas hoy.";
+                errCons.classList.remove('hidden');
             }
         };
 
