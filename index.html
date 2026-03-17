@@ -156,9 +156,10 @@
             fetch('https://app.bde.es/bierest/resources/srdatosapp/favoritas?idioma=es&series=DTNPDE2010_P0000P_PS_APU')
                 .then(r => r.json())
                 .then(data => {
-                    const deudaMillones = data[0].valor;
+                    const deudaPctPIB = data[0].valor;
+                    const PIB_ESPANA = 1460000000000;
                     const ciudadanosDNI = 42327164;
-                    const deudaPerCapita = (deudaMillones * 1e9) / ciudadanosDNI;
+                    const deudaPerCapita = (deudaPctPIB / 100 * PIB_ESPANA) / ciudadanosDNI;
                     document.getElementById('deuda-per-capita').innerText =
                         deudaPerCapita.toLocaleString('en-US', {style:'currency', currency:'EUR'});
                 })
