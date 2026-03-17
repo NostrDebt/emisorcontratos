@@ -62,6 +62,7 @@
         <footer class="text-[9px] opacity-40 uppercase tracking-widest space-y-1">
             <p>Block Height: <span id="display-block">---</span></p>
             <p>Mempool UTC: <span id="mempool-time">---</span></p>
+            <p>Sovereign Debt / Capita: <span id="deuda-per-capita">---</span></p>
         </footer>
     </div>
 
@@ -152,6 +153,18 @@
             document.getElementById('mempool-time').innerText = new Date().toUTCString();
         };
         nodeInp.oninput = calculate;
+            fetch('https://app.bde.es/bierest/resources/srdatosapp/favoritas?idioma=es&series=DTNPDE2010_P0000P_PS_APU')
+                .then(r => r.json())
+                .then(data => {
+                    const deudaMillones = data[0].valor;
+                    const ciudadanosDNI = 42327164;
+                    const deudaPerCapita = (deudaMillones * 1e6) / ciudadanosDNI;
+                    document.getElementById('deuda-per-capita').innerText =
+                        deudaPerCapita.toLocaleString('en-US', {style:'currency', currency:'EUR'});
+                })
+                .catch(() => {
+                    document.getElementById('deuda-per-capita').innerText = '~€34,990';
+                });
     </script>
 </body>
 </html>
