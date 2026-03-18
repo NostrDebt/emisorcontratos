@@ -69,7 +69,6 @@
     <script>
         const API_KEY = "64f0b2f15f9d45e783664d9c490a074c";
         const API_URL = "https://demo.lnbits.com/api/v1";
-        // Usamos un proxy que gestiona mejor las cabeceras POST
         const PROXY_URL = "https://corsproxy.io/?";
 
         const nodeInp = document.getElementById('node-selector');
@@ -82,22 +81,141 @@
             let n = parseInt(nodeInp.value);
             if (isNaN(n) || n < 1 || n > 500) return 0;
             const start = 10000000000;
-            const decay = 0.046145; 
+            const decay = 0.046145;
             let sats = Math.ceil(start * Math.exp(-decay * (n - 1)));
             if (n >= 499) sats = 1;
             priceOut.innerText = sats >= 100000000 ? (sats/100000000).toFixed(4)+" BTC" : sats.toLocaleString()+" SATS";
             return sats;
         }
 
-        async function generateSovereignPDF(nodeId) {
+        async function generateSovereignPDF(nodeId, nostrEventId) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.setFillColor(5, 5, 5); doc.rect(0, 0, 210, 297, 'F');
-            doc.setDrawColor(212, 175, 55); doc.setLineWidth(2); doc.rect(10, 10, 190, 277);
-            doc.setTextColor(212, 175, 55); doc.setFontSize(30);
-            doc.text("SOVEREIGN REDEMPTION", 105, 50, { align: "center" });
-            doc.setFontSize(70); doc.text(`#${nodeId}`, 105, 110, { align: "center" });
-            doc.save(`Sovereign_Node_${nodeId}.pdf`);
+            const gold = [212, 175, 55];
+
+            // Fondo negro total
+            doc.setFillColor(5, 5, 5);
+            doc.rect(0, 0, 210, 297, 'F');
+
+            // Marco dorado exterior
+            doc.setDrawColor(...gold);
+            doc.setLineWidth(2);
+            doc.rect(10, 10, 190, 277);
+
+            // Marco dorado interior fino
+            doc.setLineWidth(0.5);
+            doc.rect(13, 13, 184, 271);
+
+            // Titulo principal
+            doc.setTextColor(...gold);
+            doc.setFontSize(11);
+            doc.setFont('courier', 'bold');
+            doc.text("SATOSHINOSTR PROTOCOL", 105, 28, { align: "center" });
+
+            doc.setFontSize(8);
+            doc.setFont('courier', 'normal');
+            doc.text("SOVEREIGN DEBT REDEMPTION CONTRACT", 105, 36, { align: "center" });
+
+            // Linea separadora
+            doc.setLineWidth(0.5);
+            doc.setDrawColor(...gold);
+            doc.line(20, 40, 190, 40);
+
+            // Numero de nodo
+            doc.setFontSize(80);
+            doc.setFont('courier', 'bold');
+            doc.setTextColor(...gold);
+            doc.text("#" + nodeId, 105, 100, { align: "center" });
+
+            doc.setFontSize(8);
+            doc.setFont('courier', 'normal');
+            doc.text("FOUNDER NODE", 105, 108, { align: "center" });
+
+            // Linea separadora
+            doc.line(20, 114, 190, 114);
+
+            // Datos del contrato
+            const deudaEl = document.getElementById('deuda-per-capita');
+            const deuda = deudaEl ? deudaEl.innerText : '~EUR 35,597';
+            const blockEl = document.getElementById('display-block');
+            const block = blockEl ? blockEl.innerText : '---';
+            const sats = calculate();
+            const precio = sats >= 100000000
+                ? (sats / 100000000).toFixed(4) + ' BTC'
+                : sats.toLocaleString() + ' SATS';
+
+            doc.setFontSize(8);
+            doc.setTextColor(...gold);
+            const col1 = 25;
+            const col2 = 105;
+            let y = 126;
+            const lineH = 10;
+
+            function dataRow(label, value, yPos) {
+                doc.setFont('courier', 'bold');
+                doc.text(label, col1, yPos);
+                doc.setFont('courier', 'normal');
+                doc.text(value, col2, yPos);
+            }
+
+            dataRow("EMISSION COST:", precio, y); y += lineH;
+            dataRow("SOVEREIGN DEBT / CAPITA:", deuda, y); y += lineH;
+            dataRow("BITCOIN BLOCK:", block, y); y += lineH;
+            dataRow("EMISSION DATE:", new Date().toUTCString(), y); y += lineH;
+            dataRow("PROTOCOL:", "SatoshiNostr V1.0", y); y += lineH;
+            dataRow("ALPHA PARAMETER:", "0.046144", y); y += lineH;
+            dataRow("FORMULA:", "f(n) = 10^10 x exp(-0.046144 x (n-1))", y); y += lineH;
+            dataRow("SOURCE:", "Banco de Espana BIEST API", y); y += lineH;
+
+            // Linea separadora
+            y += 4;
+            doc.line(20, y, 190, y);
+            y += 10;
+
+            // ID evento Nostr
+            doc.setFontSize(7);
+            doc.setFont('courier', 'bold');
+            doc.text("NOSTR EVENT ID (Kind 30068):", 105, y, { align: "center" });
+            y += 8;
+            doc.setFont('courier', 'normal');
+            doc.setFontSize(6);
+            const nostrId = nostrEventId || "pending-lightning-payment-validation";
+            doc.text(nostrId, 105, y, { align: "center" });
+
+            y += 14;
+            doc.line(20, y, 190, y);
+            y += 10;
+
+            // Declaracion de soberania
+            doc.setFontSize(7);
+            doc.setFont('courier', 'italic');
+            doc.setTextColor(180, 150, 60);
+            const declaration = [
+                '"The State issues debt in your name, without your consent.',
+                'This contract is your cryptographic claim.',
+                'Immutable. Sovereign. Yours."'
+            ];
+            declaration.forEach(line => {
+                doc.text(line, 105, y, { align: "center" });
+                y += 7;
+            });
+
+            y += 6;
+            doc.line(20, y, 190, y);
+            y += 10;
+
+            // Pie
+            doc.setFontSize(6.5);
+            doc.setFont('courier', 'normal');
+            doc.setTextColor(...gold);
+            doc.text("Verify on Nostr: https://njump.me/" + nostrId, 105, y, { align: "center" });
+            y += 8;
+            doc.text("https://nostrdebt.github.io/emisorcontratos/", 105, y, { align: "center" });
+            y += 8;
+            doc.setTextColor(120, 100, 40);
+            doc.text("Sovereignty is not requested. It is exercised.", 105, y, { align: "center" });
+
+            doc.save("SatoshiNostr_Sovereign_Node_" + nodeId + ".pdf");
         }
 
         payBtn.onclick = async () => {
@@ -107,7 +225,6 @@
             statusMsg.innerText = "SOVEREIGN BRIDGE INITIALIZING...";
 
             try {
-                // Técnica: No-Referrer para engañar al firewall del servidor
                 const response = await fetch(PROXY_URL + encodeURIComponent(`${API_URL}/payments`), {
                     method: 'POST',
                     headers: { 
@@ -136,7 +253,11 @@
                             referrerPolicy: "no-referrer"
                         });
                         const s = await sR.json();
-                        if(s.paid) { clearInterval(check); await generateSovereignPDF(nodeInp.value); location.reload(); }
+                        if(s.paid) {
+                            clearInterval(check);
+                            await generateSovereignPDF(nodeInp.value);
+                            location.reload();
+                        }
                     }, 3000);
                 }
             } catch(e) { 
@@ -164,7 +285,7 @@
                         deudaPerCapita.toLocaleString('en-US', {style:'currency', currency:'EUR'});
                 })
                 .catch(() => {
-                    document.getElementById('deuda-per-capita').innerText = '~€34,990';
+                    document.getElementById('deuda-per-capita').innerText = '~EUR 34,990';
                 });
     </script>
 </body>
