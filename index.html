@@ -52,11 +52,12 @@
             </button>
         </div>
 
-        <div id="payment-area" class="hidden p-6 bg-white rounded shadow-2xl space-y-4">
-            <div id="status-msg" class="text-black text-[10px] font-black uppercase text-center mb-2 font-bold italic">Bypassing Firewall...</div>
-            <div id="qrcode-container" class="flex justify-center bg-white min-h-[220px] items-center"></div>
-            <div id="error-console" class="hidden text-[8px] text-red-600 font-mono text-left bg-red-50 p-2 border border-red-200"></div>
-            <p id="invoice-str" class="text-[7px] text-black break-all opacity-40 font-mono text-center select-all px-4"></p>
+        <div id="payment-area" class="hidden p-6 bg-black rounded gold-border shadow-2xl space-y-4">
+            <div id="status-msg" class="gold-text text-[10px] font-black uppercase text-center mb-2 font-bold italic">Initializing Sovereign Bridge...</div>
+            <div id="qrcode-container" class="flex justify-center bg-white min-h-[220px] items-center rounded"></div>
+            <div id="invoice-str" class="text-[7px] text-stone-400 break-all font-mono text-center select-all px-4"></div>
+            <div id="error-console" class="hidden text-[8px] text-red-400 font-mono text-left bg-red-950 p-2 border border-red-800 rounded"></div>
+            <div id="debug-log" class="hidden text-[7px] text-stone-500 font-mono text-left space-y-1 border-t border-stone-800 pt-2 mt-2"></div>
         </div>
 
         <footer class="text-[9px] uppercase tracking-widest space-y-1 gold-text opacity-70">
@@ -67,15 +68,25 @@
     </div>
 
     <script>
-        const API_KEY = "64f0b2f15f9d45e783664d9c490a074c";
-        const API_URL = "https://demo.lnbits.com/api/v1";
-        const PROXY_URL = "https://corsproxy.io/?";
+        // --- BLINK API CONFIG ---
+        const BLINK_API = "https://api.blink.sv/graphql";
+        const BLINK_KEY = "blink_VFdsZVWNyPk2QjfU7z5sYUz4MODPrrIlfPvaXfKqN2pYOwxhc92DAJwRgwOLrgqn";
+        const WALLET_ID = "244ec87a-2931-4662-80ce-0f131b2a9609";
 
         const nodeInp = document.getElementById('node-selector');
         const priceOut = document.getElementById('current-price');
         const payBtn = document.getElementById('btn-pay');
         const statusMsg = document.getElementById('status-msg');
         const errCons = document.getElementById('error-console');
+        const debugLog = document.getElementById('debug-log');
+
+        function log(msg) {
+            const line = document.createElement('p');
+            line.innerText = '> ' + msg;
+            debugLog.appendChild(line);
+            debugLog.classList.remove('hidden');
+            console.log(msg);
+        }
 
         function calculate() {
             let n = parseInt(nodeInp.value);
@@ -84,8 +95,74 @@
             const decay = 0.046145;
             let sats = Math.ceil(start * Math.exp(-decay * (n - 1)));
             if (n >= 499) sats = 1;
-            priceOut.innerText = sats >= 100000000 ? (sats/100000000).toFixed(4)+" BTC" : sats.toLocaleString()+" SATS";
+            priceOut.innerText = sats >= 100000000
+                ? (sats / 100000000).toFixed(4) + " BTC"
+                : sats.toLocaleString() + " SATS";
             return sats;
+        }
+
+        async function blinkQuery(query, variables = {}) {
+            const response = await fetch(BLINK_API, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-KEY': BLINK_KEY
+                },
+                body: JSON.stringify({ query, variables })
+            });
+            if (!response.ok) throw new Error('Blink API HTTP error: ' + response.status);
+            const data = await response.json();
+            if (data.errors) throw new Error('Blink GraphQL error: ' + data.errors[0].message);
+            return data.data;
+        }
+
+        async function createInvoice(sats, memo) {
+            log('Creating invoice for ' + sats + ' sats...');
+            const query = `
+                mutation LnInvoiceCreate($input: LnInvoiceCreateInput!) {
+                    lnInvoiceCreate(input: $input) {
+                        invoice {
+                            paymentRequest
+                            paymentHash
+                            satoshis
+                        }
+                        errors {
+                            message
+                        }
+                    }
+                }
+            `;
+            const variables = {
+                input: {
+                    walletId: WALLET_ID,
+                    amount: sats,
+                    memo: memo
+                }
+            };
+            const data = await blinkQuery(query, variables);
+            if (data.lnInvoiceCreate.errors && data.lnInvoiceCreate.errors.length > 0) {
+                throw new Error(data.lnInvoiceCreate.errors[0].message);
+            }
+            return data.lnInvoiceCreate.invoice;
+        }
+
+        async function checkPayment(expectedSats, balanceAntes) {
+        const query = `
+        query Me {
+            me {
+                defaultAccount {
+                    wallets {
+                        walletCurrency
+                        balance
+                    }
+                }
+            }
+          }
+    `   ;
+        const data = await blinkQuery(query);
+        const wallets = data.me.defaultAccount.wallets;
+        const btcWallet = wallets.find(w => w.walletCurrency === 'BTC');
+        return btcWallet.balance;
         }
 
         async function generateSovereignPDF(nodeId, nostrEventId) {
@@ -93,48 +170,35 @@
             const doc = new jsPDF();
             const gold = [212, 175, 55];
 
-            // Fondo negro total
             doc.setFillColor(5, 5, 5);
             doc.rect(0, 0, 210, 297, 'F');
-
-            // Marco dorado exterior
             doc.setDrawColor(...gold);
             doc.setLineWidth(2);
             doc.rect(10, 10, 190, 277);
-
-            // Marco dorado interior fino
             doc.setLineWidth(0.5);
             doc.rect(13, 13, 184, 271);
 
-            // Titulo principal
             doc.setTextColor(...gold);
             doc.setFontSize(11);
             doc.setFont('courier', 'bold');
             doc.text("SATOSHINOSTR PROTOCOL", 105, 28, { align: "center" });
-
             doc.setFontSize(8);
             doc.setFont('courier', 'normal');
             doc.text("SOVEREIGN DEBT REDEMPTION CONTRACT", 105, 36, { align: "center" });
 
-            // Linea separadora
             doc.setLineWidth(0.5);
             doc.setDrawColor(...gold);
             doc.line(20, 40, 190, 40);
 
-            // Numero de nodo
             doc.setFontSize(80);
             doc.setFont('courier', 'bold');
             doc.setTextColor(...gold);
             doc.text("#" + nodeId, 105, 100, { align: "center" });
-
             doc.setFontSize(8);
             doc.setFont('courier', 'normal');
             doc.text("FOUNDER NODE", 105, 108, { align: "center" });
-
-            // Linea separadora
             doc.line(20, 114, 190, 114);
 
-            // Datos del contrato
             const deudaEl = document.getElementById('deuda-per-capita');
             const deuda = deudaEl ? deudaEl.innerText : '~EUR 35,597';
             const blockEl = document.getElementById('display-block');
@@ -146,16 +210,14 @@
 
             doc.setFontSize(8);
             doc.setTextColor(...gold);
-            const col1 = 25;
-            const col2 = 105;
             let y = 126;
             const lineH = 10;
 
             function dataRow(label, value, yPos) {
                 doc.setFont('courier', 'bold');
-                doc.text(label, col1, yPos);
+                doc.text(label, 25, yPos);
                 doc.setFont('courier', 'normal');
-                doc.text(value, col2, yPos);
+                doc.text(value, 105, yPos);
             }
 
             dataRow("EMISSION COST:", precio, y); y += lineH;
@@ -167,51 +229,41 @@
             dataRow("FORMULA:", "f(n) = 10^10 x exp(-0.046144 x (n-1))", y); y += lineH;
             dataRow("SOURCE:", "Banco de Espana BIEST API", y); y += lineH;
 
-            // Linea separadora
             y += 4;
             doc.line(20, y, 190, y);
             y += 10;
 
-            // ID evento Nostr
             doc.setFontSize(7);
             doc.setFont('courier', 'bold');
             doc.text("NOSTR EVENT ID (Kind 30068):", 105, y, { align: "center" });
             y += 8;
             doc.setFont('courier', 'normal');
             doc.setFontSize(6);
-            const nostrId = nostrEventId || "pending-lightning-payment-validation";
+            const nostrId = nostrEventId || "pending";
             doc.text(nostrId, 105, y, { align: "center" });
 
             y += 14;
             doc.line(20, y, 190, y);
             y += 10;
 
-            // Declaracion de soberania
             doc.setFontSize(7);
             doc.setFont('courier', 'italic');
             doc.setTextColor(180, 150, 60);
-            const declaration = [
+            [
                 '"The State issues debt in your name, without your consent.',
                 'This contract is your cryptographic claim.',
                 'Immutable. Sovereign. Yours."'
-            ];
-            declaration.forEach(line => {
-                doc.text(line, 105, y, { align: "center" });
-                y += 7;
-            });
+            ].forEach(line => { doc.text(line, 105, y, { align: "center" }); y += 7; });
 
             y += 6;
             doc.line(20, y, 190, y);
             y += 10;
 
-            // Pie
             doc.setFontSize(6.5);
             doc.setFont('courier', 'normal');
             doc.setTextColor(...gold);
-            doc.text("Verify on Nostr: https://njump.me/" + nostrId, 105, y, { align: "center" });
-            y += 8;
-            doc.text("https://nostrdebt.github.io/emisorcontratos/", 105, y, { align: "center" });
-            y += 8;
+            doc.text("Verify on Nostr: https://njump.me/" + nostrId, 105, y, { align: "center" }); y += 8;
+            doc.text("https://nostrdebt.github.io/emisorcontratos/", 105, y, { align: "center" }); y += 8;
             doc.setTextColor(120, 100, 40);
             doc.text("Sovereignty is not requested. It is exercised.", 105, y, { align: "center" });
 
@@ -220,73 +272,92 @@
 
         payBtn.onclick = async () => {
             const amt = calculate();
+            if (amt === 0) { alert('Select a valid node between 1 and 500.'); return; }
+
+            const nodeId = parseInt(nodeInp.value);
             document.getElementById('payment-area').classList.remove('hidden');
             errCons.classList.add('hidden');
+            debugLog.innerHTML = '';
             statusMsg.innerText = "SOVEREIGN BRIDGE INITIALIZING...";
+            payBtn.disabled = true;
+            payBtn.classList.add('opacity-50');
 
             try {
-                const response = await fetch(PROXY_URL + encodeURIComponent(`${API_URL}/payments`), {
-                    method: 'POST',
-                    headers: { 
-                        'X-Api-Key': API_KEY,
-                        'Content-Type': 'application/json'
-                    },
-                    referrerPolicy: "no-referrer",
-                    body: JSON.stringify({out: false, amount: amt, memo: "Node #"+nodeInp.value, unit: "sat"})
-                });
+                const invoice = await createInvoice(amt, "SatoshiNostr Node #" + nodeId);
+                log('Invoice created. Hash: ' + invoice.paymentHash.substring(0, 16) + '...');
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Server Response: ${response.status} - ${errorText.substring(0, 50)}`);
-                }
+                statusMsg.innerText = "PROTOCOL ENGAGED. SCAN QR TO PAY:";
+                document.getElementById('qrcode-container').innerHTML =
+                    `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${invoice.paymentRequest}" class="border-4 border-black">`;
+                document.getElementById('invoice-str').innerText = invoice.paymentRequest;
 
-                const data = await response.json();
-                
-                if(data.payment_request) {
-                    statusMsg.innerText = "PROTOCOL ENGAGED. SCAN QR:";
-                    document.getElementById('qrcode-container').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${data.payment_request}" class="border-4 border-black">`;
-                    document.getElementById('invoice-str').innerText = data.payment_request;
-                    
-                    const check = setInterval(async () => {
-                        const sR = await fetch(PROXY_URL + encodeURIComponent(`${API_URL}/payments/${data.payment_hash}`), {
-                            headers: {'X-Api-Key': API_KEY},
-                            referrerPolicy: "no-referrer"
-                        });
-                        const s = await sR.json();
-                        if(s.paid) {
+                log('Getting current balance...');
+                const balanceAntes = await checkPayment(amt, 0);
+                log('Balance before payment: ' + balanceAntes + ' sats');
+                log('Waiting for payment confirmation...');
+                let attempts = 0;
+                const maxAttempts = 120;
+
+                const check = setInterval(async () => {
+                    attempts++;
+                    if (attempts > maxAttempts) {
+                        clearInterval(check);
+                        statusMsg.innerText = "TIMEOUT. RELOAD AND TRY AGAIN.";
+                        payBtn.disabled = false;
+                        payBtn.classList.remove('opacity-50');
+                        return;
+                    }
+                    try {
+                        const balanceAhora = await checkPayment(amt, balanceAntes);
+                        log('Balance [' + attempts + ']: ' + balanceAhora + ' sats (before: ' + balanceAntes + ')');
+                        if (balanceAhora > balanceAntes) {
                             clearInterval(check);
-                            await generateSovereignPDF(nodeInp.value);
-                            location.reload();
+                            statusMsg.innerText = "PAYMENT CONFIRMED. GENERATING CONTRACT...";
+                            log('Payment confirmed. Balance increased by ' + (balanceAhora - balanceAntes) + ' sats.');
+                            await generateSovereignPDF(nodeId);
+                            statusMsg.innerText = "CONTRACT ISSUED. SOVEREIGNTY CLAIMED.";
+                            payBtn.disabled = false;
+                            payBtn.classList.remove('opacity-50');
                         }
-                    }, 3000);
-                }
-            } catch(e) { 
+                    } catch (pollErr) {
+                        log('Poll error: ' + pollErr.message);
+                    }
+            }, 5000);
+
+            } catch(e) {
                 statusMsg.innerText = "BRIDGE FAILED";
-                errCons.innerText = "ERROR LOG: " + e.message;
+                errCons.innerText = "ERROR: " + e.message;
                 errCons.classList.remove('hidden');
+                log('Fatal error: ' + e.message);
+                payBtn.disabled = false;
+                payBtn.classList.remove('opacity-50');
                 console.error(e);
             }
         };
 
         window.onload = () => {
             calculate();
-            fetch('https://mempool.space/api/blocks/tip/height').then(r => r.text()).then(h => document.getElementById('display-block').innerText = h);
+            fetch('https://mempool.space/api/blocks/tip/height')
+                .then(r => r.text())
+                .then(h => document.getElementById('display-block').innerText = h);
             document.getElementById('mempool-time').innerText = new Date().toUTCString();
         };
+
         nodeInp.oninput = calculate;
-            fetch('https://app.bde.es/bierest/resources/srdatosapp/favoritas?idioma=es&series=DTNPDE2010_P0000P_PS_APU')
-                .then(r => r.json())
-                .then(data => {
-                    const deudaPctPIB = data[0].valor;
-                    const PIB_ESPANA = 1460000000000;
-                    const ciudadanosDNI = 42327164;
-                    const deudaPerCapita = (deudaPctPIB / 100 * PIB_ESPANA) / ciudadanosDNI;
-                    document.getElementById('deuda-per-capita').innerText =
-                        deudaPerCapita.toLocaleString('en-US', {style:'currency', currency:'EUR'});
-                })
-                .catch(() => {
-                    document.getElementById('deuda-per-capita').innerText = '~EUR 34,990';
-                });
+
+        fetch('https://app.bde.es/bierest/resources/srdatosapp/favoritas?idioma=es&series=DTNPDE2010_P0000P_PS_APU')
+            .then(r => r.json())
+            .then(data => {
+                const deudaPctPIB = data[0].valor;
+                const PIB_ESPANA = 1460000000000;
+                const ciudadanosDNI = 42327164;
+                const deudaPerCapita = (deudaPctPIB / 100 * PIB_ESPANA) / ciudadanosDNI;
+                document.getElementById('deuda-per-capita').innerText =
+                    deudaPerCapita.toLocaleString('en-US', { style: 'currency', currency: 'EUR' });
+            })
+            .catch(() => {
+                document.getElementById('deuda-per-capita').innerText = '~EUR 34,990';
+            });
     </script>
 </body>
 </html>
