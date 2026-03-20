@@ -15,6 +15,28 @@
         .gold-text { color: #d4af37; }
         .gold-border { border: 2px solid #d4af37; }
         .cypher-bg { background: rgba(10, 10, 10, 0.98); }
+        .advanced-panel { display: none; }
+        .advanced-panel.open { display: block; }
+        .param-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #1a1a1a;
+            padding: 4px 0;
+            font-size: 9px;
+        }
+        .param-label { color: #888; text-transform: uppercase; }
+        .param-value { color: #d4af37; font-family: 'Courier New', monospace; }
+        .json-block {
+            background: #0a0a0a;
+            border: 1px solid #d4af3740;
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 9px;
+            text-align: left;
+            color: #d4af37;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4 text-center">
@@ -38,7 +60,7 @@
             <div class="grid grid-cols-2 gap-4 border-t border-stone-800 pt-4">
                 <div>
                     <label class="text-[9px] font-bold uppercase gold-text block mb-1">Founder Node (1-500):</label>
-                    <input type="number" id="node-selector" value="494" min="1" max="1000"
+                    <input type="number" id="node-selector" value="494" min="1" max="500"
                         class="w-full bg-black border border-stone-600 p-2 text-xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
                 </div>
                 <div class="text-right">
@@ -65,6 +87,59 @@
             <p>Mempool UTC: <span id="mempool-time">---</span></p>
             <p>Sovereign Debt / Capita: <span id="deuda-per-capita">---</span></p>
         </footer>
+
+        <!-- ADVANCED MODE TOGGLE -->
+        <div class="border-t border-stone-800 pt-4">
+            <button id="toggle-advanced" class="text-[9px] uppercase tracking-widest text-stone-500 hover:text-[#d4af37] transition-colors w-full text-center cursor-pointer">
+                <span id="toggle-label">[ + Advanced Mode ]</span>
+            </button>
+        </div>
+
+        <!-- ADVANCED PANEL -->
+        <div id="advanced-panel" class="advanced-panel cypher-bg rounded gold-border p-6 space-y-6 text-left">
+
+            <div>
+                <p class="text-[9px] uppercase tracking-widest gold-text mb-3">Protocol Parameters</p>
+                <div class="space-y-0">
+                    <div class="param-row"><span class="param-label">Protocol</span><span class="param-value">SatoshiNostr V1.0</span></div>
+                    <div class="param-row"><span class="param-label">Total Nodes</span><span class="param-value">500 (Founder Phase)</span></div>
+                    <div class="param-row"><span class="param-label">Formula</span><span class="param-value">f(n) = 10^10 x e^(-0.046144 x (n-1))</span></div>
+                    <div class="param-row"><span class="param-label">Alpha Parameter</span><span class="param-value">0.046144</span></div>
+                    <div class="param-row"><span class="param-label">Node #1 Cost</span><span class="param-value">100 BTC</span></div>
+                    <div class="param-row"><span class="param-label">Node #499 Cost</span><span class="param-value">1 SAT</span></div>
+                    <div class="param-row"><span class="param-label">Selected Node</span><span class="param-value" id="adv-node">---</span></div>
+                    <div class="param-row"><span class="param-label">Selected Cost</span><span class="param-value" id="adv-price">---</span></div>
+                    <div class="param-row"><span class="param-label">Debt Source</span><span class="param-value">Banco de Espana BIEST API</span></div>
+                    <div class="param-row"><span class="param-label">Debt Fallback</span><span class="param-value">Eurostat -> INE -> 34,990 EUR</span></div>
+                    <div class="param-row"><span class="param-label">Lightning Backend</span><span class="param-value">Blink GraphQL API</span></div>
+                    <div class="param-row"><span class="param-label">Nostr Kind</span><span class="param-value">30068</span></div>
+                    <div class="param-row"><span class="param-label">Oracle Pubkey</span><span class="param-value" style="font-size:7px">976baa6f835c2d07d2ca79d470f190d04187e7ed51a05a3120dcc4772219e470</span></div>
+                    <div class="param-row"><span class="param-label">Contract #1 ID</span><span class="param-value" style="font-size:7px">970bb8ebf7c0365225246669bfcba41376389763d20158998acc4175bae865ad</span></div>
+                </div>
+            </div>
+
+            <div>
+                <p class="text-[9px] uppercase tracking-widest gold-text mb-3">Nostr Event Structure (Kind 30068)</p>
+                <div class="json-block" id="nostr-json-preview">Loading...</div>
+            </div>
+
+            <div>
+                <p class="text-[9px] uppercase tracking-widest gold-text mb-3">Connection Log</p>
+                <div id="advanced-log" class="json-block text-stone-400" style="min-height:60px">
+                    <p>> Protocol initialized</p>
+                </div>
+            </div>
+
+            <div class="border-t border-stone-800 pt-4">
+                <p class="text-[9px] uppercase tracking-widest text-stone-500 mb-2">Verify Genesis Contract #1</p>
+                <a href="https://njump.me/970bb8ebf7c0365225246669bfcba41376389763d20158998acc4175bae865ad"
+                   target="_blank"
+                   class="text-[8px] gold-text underline break-all">
+                    njump.me/970bb8eb...865ad ->
+                </a>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -79,12 +154,58 @@
         const statusMsg = document.getElementById('status-msg');
         const errCons = document.getElementById('error-console');
         const debugLog = document.getElementById('debug-log');
+        const advLogEl = document.getElementById('advanced-log');
+
+        // --- ADVANCED MODE ---
+        let advancedOpen = false;
+        document.getElementById('toggle-advanced').onclick = () => {
+            advancedOpen = !advancedOpen;
+            document.getElementById('advanced-panel').classList.toggle('open', advancedOpen);
+            document.getElementById('toggle-label').innerText = advancedOpen ? '[ - Simple Mode ]' : '[ + Advanced Mode ]';
+            if (advancedOpen) updateAdvancedPanel();
+        };
+
+        function advLog(msg) {
+            const line = document.createElement('p');
+            line.innerText = '> ' + msg;
+            advLogEl.appendChild(line);
+        }
+
+        function updateNostrJSON(nodeId) {
+            const deuda = document.getElementById('deuda-per-capita').innerText;
+            const block = document.getElementById('display-block').innerText;
+            const preview = {
+                kind: 30068,
+                created_at: Math.floor(Date.now() / 1000),
+                tags: [
+                    ["d", "contrato-" + nodeId],
+                    ["numero", String(nodeId)],
+                    ["deuda_per_capita_eur", deuda],
+                    ["fuente_deuda", "Banco de Espana BIEST API"],
+                    ["protocolo", "SatoshiNostr V1.0"],
+                    ["alpha_parameter", "0.046144"],
+                    ["formula", "10e9 * exp(-0.046144 * (n-1))"],
+                    ["block_height", block]
+                ],
+                content: "Contrato #" + nodeId + " - Protocolo SatoshiNostr - Declaracion de Soberania",
+                pubkey: "976baa6f835c2d07d2ca79d470f190d04187e7ed51a05a3120dcc4772219e470"
+            };
+            document.getElementById('nostr-json-preview').innerText = JSON.stringify(preview, null, 2);
+        }
+
+        function updateAdvancedPanel() {
+            const n = parseInt(nodeInp.value) || 494;
+            document.getElementById('adv-node').innerText = '#' + n;
+            document.getElementById('adv-price').innerText = priceOut.innerText;
+            updateNostrJSON(n);
+        }
 
         function log(msg) {
             const line = document.createElement('p');
             line.innerText = '> ' + msg;
             debugLog.appendChild(line);
             debugLog.classList.remove('hidden');
+            advLog(msg);
             console.log(msg);
         }
 
@@ -98,16 +219,14 @@
             priceOut.innerText = sats >= 100000000
                 ? (sats / 100000000).toFixed(4) + " BTC"
                 : sats.toLocaleString() + " SATS";
+            if (advancedOpen) updateAdvancedPanel();
             return sats;
         }
 
         async function blinkQuery(query, variables = {}) {
             const response = await fetch(BLINK_API, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-KEY': BLINK_KEY
-                },
+                headers: { 'Content-Type': 'application/json', 'X-API-KEY': BLINK_KEY },
                 body: JSON.stringify({ query, variables })
             });
             if (!response.ok) throw new Error('Blink API HTTP error: ' + response.status);
@@ -121,48 +240,23 @@
             const query = `
                 mutation LnInvoiceCreate($input: LnInvoiceCreateInput!) {
                     lnInvoiceCreate(input: $input) {
-                        invoice {
-                            paymentRequest
-                            paymentHash
-                            satoshis
-                        }
-                        errors {
-                            message
-                        }
+                        invoice { paymentRequest paymentHash satoshis }
+                        errors { message }
                     }
                 }
             `;
-            const variables = {
-                input: {
-                    walletId: WALLET_ID,
-                    amount: sats,
-                    memo: memo
-                }
-            };
-            const data = await blinkQuery(query, variables);
+            const data = await blinkQuery(query, { input: { walletId: WALLET_ID, amount: sats, memo: memo } });
             if (data.lnInvoiceCreate.errors && data.lnInvoiceCreate.errors.length > 0) {
                 throw new Error(data.lnInvoiceCreate.errors[0].message);
             }
             return data.lnInvoiceCreate.invoice;
         }
 
-        async function checkPayment(expectedSats, balanceAntes) {
-        const query = `
-        query Me {
-            me {
-                defaultAccount {
-                    wallets {
-                        walletCurrency
-                        balance
-                    }
-                }
-            }
-          }
-    `   ;
-        const data = await blinkQuery(query);
-        const wallets = data.me.defaultAccount.wallets;
-        const btcWallet = wallets.find(w => w.walletCurrency === 'BTC');
-        return btcWallet.balance;
+        async function checkPayment() {
+            const query = `query Me { me { defaultAccount { wallets { walletCurrency balance } } } }`;
+            const data = await blinkQuery(query);
+            const wallets = data.me.defaultAccount.wallets;
+            return wallets.find(w => w.walletCurrency === 'BTC').balance;
         }
 
         async function generateSovereignPDF(nodeId, nostrEventId) {
@@ -170,56 +264,33 @@
             const doc = new jsPDF();
             const gold = [212, 175, 55];
 
-            doc.setFillColor(5, 5, 5);
-            doc.rect(0, 0, 210, 297, 'F');
-            doc.setDrawColor(...gold);
-            doc.setLineWidth(2);
-            doc.rect(10, 10, 190, 277);
-            doc.setLineWidth(0.5);
-            doc.rect(13, 13, 184, 271);
+            doc.setFillColor(5, 5, 5); doc.rect(0, 0, 210, 297, 'F');
+            doc.setDrawColor(...gold); doc.setLineWidth(2); doc.rect(10, 10, 190, 277);
+            doc.setLineWidth(0.5); doc.rect(13, 13, 184, 271);
 
-            doc.setTextColor(...gold);
-            doc.setFontSize(11);
-            doc.setFont('courier', 'bold');
+            doc.setTextColor(...gold); doc.setFontSize(11); doc.setFont('courier', 'bold');
             doc.text("SATOSHINOSTR PROTOCOL", 105, 28, { align: "center" });
-            doc.setFontSize(8);
-            doc.setFont('courier', 'normal');
+            doc.setFontSize(8); doc.setFont('courier', 'normal');
             doc.text("SOVEREIGN DEBT REDEMPTION CONTRACT", 105, 36, { align: "center" });
+            doc.setLineWidth(0.5); doc.setDrawColor(...gold); doc.line(20, 40, 190, 40);
 
-            doc.setLineWidth(0.5);
-            doc.setDrawColor(...gold);
-            doc.line(20, 40, 190, 40);
-
-            doc.setFontSize(80);
-            doc.setFont('courier', 'bold');
-            doc.setTextColor(...gold);
+            doc.setFontSize(80); doc.setFont('courier', 'bold'); doc.setTextColor(...gold);
             doc.text("#" + nodeId, 105, 100, { align: "center" });
-            doc.setFontSize(8);
-            doc.setFont('courier', 'normal');
+            doc.setFontSize(8); doc.setFont('courier', 'normal');
             doc.text("FOUNDER NODE", 105, 108, { align: "center" });
             doc.line(20, 114, 190, 114);
 
-            const deudaEl = document.getElementById('deuda-per-capita');
-            const deuda = deudaEl ? deudaEl.innerText : '~EUR 35,597';
-            const blockEl = document.getElementById('display-block');
-            const block = blockEl ? blockEl.innerText : '---';
+            const deuda = document.getElementById('deuda-per-capita').innerText || '~EUR 35,597';
+            const block = document.getElementById('display-block').innerText || '---';
             const sats = calculate();
-            const precio = sats >= 100000000
-                ? (sats / 100000000).toFixed(4) + ' BTC'
-                : sats.toLocaleString() + ' SATS';
+            const precio = sats >= 100000000 ? (sats/100000000).toFixed(4)+' BTC' : sats.toLocaleString()+' SATS';
 
-            doc.setFontSize(8);
-            doc.setTextColor(...gold);
-            let y = 126;
-            const lineH = 10;
-
+            doc.setFontSize(8); doc.setTextColor(...gold);
+            let y = 126; const lineH = 10;
             function dataRow(label, value, yPos) {
-                doc.setFont('courier', 'bold');
-                doc.text(label, 25, yPos);
-                doc.setFont('courier', 'normal');
-                doc.text(value, 105, yPos);
+                doc.setFont('courier', 'bold'); doc.text(label, 25, yPos);
+                doc.setFont('courier', 'normal'); doc.text(value, 105, yPos);
             }
-
             dataRow("EMISSION COST:", precio, y); y += lineH;
             dataRow("SOVEREIGN DEBT / CAPITA:", deuda, y); y += lineH;
             dataRow("BITCOIN BLOCK:", block, y); y += lineH;
@@ -229,86 +300,63 @@
             dataRow("FORMULA:", "f(n) = 10^10 x exp(-0.046144 x (n-1))", y); y += lineH;
             dataRow("SOURCE:", "Banco de Espana BIEST API", y); y += lineH;
 
-            y += 4;
-            doc.line(20, y, 190, y);
-            y += 10;
-
-            doc.setFontSize(7);
-            doc.setFont('courier', 'bold');
-            doc.text("NOSTR EVENT ID (Kind 30068):", 105, y, { align: "center" });
-            y += 8;
-            doc.setFont('courier', 'normal');
-            doc.setFontSize(6);
+            y += 4; doc.line(20, y, 190, y); y += 10;
+            doc.setFontSize(7); doc.setFont('courier', 'bold');
+            doc.text("NOSTR EVENT ID (Kind 30068):", 105, y, { align: "center" }); y += 8;
+            doc.setFont('courier', 'normal'); doc.setFontSize(6);
             const nostrId = nostrEventId || "pending";
-            doc.text(nostrId, 105, y, { align: "center" });
+            doc.text(nostrId, 105, y, { align: "center" }); y += 14;
+            doc.line(20, y, 190, y); y += 10;
 
-            y += 14;
-            doc.line(20, y, 190, y);
-            y += 10;
+            doc.setFontSize(7); doc.setFont('courier', 'italic'); doc.setTextColor(180, 150, 60);
+            ['"The State issues debt in your name, without your consent.',
+             'This contract is your cryptographic claim.',
+             'Immutable. Sovereign. Yours."'
+            ].forEach(l => { doc.text(l, 105, y, { align: "center" }); y += 7; });
 
-            doc.setFontSize(7);
-            doc.setFont('courier', 'italic');
-            doc.setTextColor(180, 150, 60);
-            [
-                '"The State issues debt in your name, without your consent.',
-                'This contract is your cryptographic claim.',
-                'Immutable. Sovereign. Yours."'
-            ].forEach(line => { doc.text(line, 105, y, { align: "center" }); y += 7; });
-
-            y += 6;
-            doc.line(20, y, 190, y);
-            y += 10;
-
-            doc.setFontSize(6.5);
-            doc.setFont('courier', 'normal');
-            doc.setTextColor(...gold);
+            y += 6; doc.line(20, y, 190, y); y += 10;
+            doc.setFontSize(6.5); doc.setFont('courier', 'normal'); doc.setTextColor(...gold);
             doc.text("Verify on Nostr: https://njump.me/" + nostrId, 105, y, { align: "center" }); y += 8;
             doc.text("https://nostrdebt.github.io/emisorcontratos/", 105, y, { align: "center" }); y += 8;
             doc.setTextColor(120, 100, 40);
             doc.text("Sovereignty is not requested. It is exercised.", 105, y, { align: "center" });
-
             doc.save("SatoshiNostr_Sovereign_Node_" + nodeId + ".pdf");
         }
 
         payBtn.onclick = async () => {
             const amt = calculate();
             if (amt === 0) { alert('Select a valid node between 1 and 500.'); return; }
-
             const nodeId = parseInt(nodeInp.value);
             document.getElementById('payment-area').classList.remove('hidden');
             errCons.classList.add('hidden');
             debugLog.innerHTML = '';
             statusMsg.innerText = "SOVEREIGN BRIDGE INITIALIZING...";
-            payBtn.disabled = true;
-            payBtn.classList.add('opacity-50');
+            payBtn.disabled = true; payBtn.classList.add('opacity-50');
 
             try {
                 const invoice = await createInvoice(amt, "SatoshiNostr Node #" + nodeId);
                 log('Invoice created. Hash: ' + invoice.paymentHash.substring(0, 16) + '...');
-
                 statusMsg.innerText = "PROTOCOL ENGAGED. SCAN QR TO PAY:";
                 document.getElementById('qrcode-container').innerHTML =
                     `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${invoice.paymentRequest}" class="border-4 border-black">`;
                 document.getElementById('invoice-str').innerText = invoice.paymentRequest;
 
                 log('Getting current balance...');
-                const balanceAntes = await checkPayment(amt, 0);
+                const balanceAntes = await checkPayment();
                 log('Balance before payment: ' + balanceAntes + ' sats');
                 log('Waiting for payment confirmation...');
-                let attempts = 0;
-                const maxAttempts = 120;
+                let attempts = 0; const maxAttempts = 120;
 
                 const check = setInterval(async () => {
                     attempts++;
                     if (attempts > maxAttempts) {
                         clearInterval(check);
                         statusMsg.innerText = "TIMEOUT. RELOAD AND TRY AGAIN.";
-                        payBtn.disabled = false;
-                        payBtn.classList.remove('opacity-50');
+                        payBtn.disabled = false; payBtn.classList.remove('opacity-50');
                         return;
                     }
                     try {
-                        const balanceAhora = await checkPayment(amt, balanceAntes);
+                        const balanceAhora = await checkPayment();
                         log('Balance [' + attempts + ']: ' + balanceAhora + ' sats (before: ' + balanceAntes + ')');
                         if (balanceAhora > balanceAntes) {
                             clearInterval(check);
@@ -316,21 +364,17 @@
                             log('Payment confirmed. Balance increased by ' + (balanceAhora - balanceAntes) + ' sats.');
                             await generateSovereignPDF(nodeId);
                             statusMsg.innerText = "CONTRACT ISSUED. SOVEREIGNTY CLAIMED.";
-                            payBtn.disabled = false;
-                            payBtn.classList.remove('opacity-50');
+                            payBtn.disabled = false; payBtn.classList.remove('opacity-50');
                         }
-                    } catch (pollErr) {
-                        log('Poll error: ' + pollErr.message);
-                    }
-            }, 5000);
+                    } catch (pollErr) { log('Poll error: ' + pollErr.message); }
+                }, 5000);
 
             } catch(e) {
                 statusMsg.innerText = "BRIDGE FAILED";
                 errCons.innerText = "ERROR: " + e.message;
                 errCons.classList.remove('hidden');
                 log('Fatal error: ' + e.message);
-                payBtn.disabled = false;
-                payBtn.classList.remove('opacity-50');
+                payBtn.disabled = false; payBtn.classList.remove('opacity-50');
                 console.error(e);
             }
         };
@@ -339,8 +383,12 @@
             calculate();
             fetch('https://mempool.space/api/blocks/tip/height')
                 .then(r => r.text())
-                .then(h => document.getElementById('display-block').innerText = h);
+                .then(h => {
+                    document.getElementById('display-block').innerText = h;
+                    advLog('Block height: ' + h);
+                });
             document.getElementById('mempool-time').innerText = new Date().toUTCString();
+            advLog('Mempool UTC: ' + new Date().toUTCString());
         };
 
         nodeInp.oninput = calculate;
@@ -353,9 +401,10 @@
             document.getElementById('deuda-per-capita').innerText =
                 eur.toLocaleString('en-US', { style: 'currency', currency: 'EUR' });
             console.log('[Deuda] Fuente: ' + fuente + ' -> ' + eur.toFixed(0) + ' EUR');
+            advLog('Debt source: ' + fuente + ' -> ' + eur.toFixed(0) + ' EUR/capita');
+            if (advancedOpen) updateAdvancedPanel();
         }
 
-        // Nivel A: API BdE BIEST (fuente primaria oficial)
         fetch('https://app.bde.es/bierest/resources/srdatosapp/favoritas?idioma=es&series=DTNPDE2010_P0000P_PS_APU')
             .then(r => { if (!r.ok) throw new Error('BdE HTTP ' + r.status); return r.json(); })
             .then(data => {
@@ -364,8 +413,7 @@
                 setDeuda((pct / 100 * PIB_ESPANA) / ciudadanosDNI, 'BdE BIEST');
             })
             .catch(() => {
-                console.warn('[Deuda] BdE fallido. Intentando Eurostat...');
-                // Nivel B: Eurostat SDMX (deuda publica Spain % PIB)
+                advLog('BdE failed. Trying Eurostat...');
                 fetch('https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/gov_10dd_edpt1?geo=ES&na_item=GD&sector=S13&unit=PC_GDP&lastTimePeriod=1')
                     .then(r => { if (!r.ok) throw new Error('Eurostat HTTP ' + r.status); return r.json(); })
                     .then(data => {
@@ -375,17 +423,12 @@
                         setDeuda((pct / 100 * PIB_ESPANA) / ciudadanosDNI, 'Eurostat SDMX');
                     })
                     .catch(() => {
-                        console.warn('[Deuda] Eurostat fallido. Intentando INE...');
-                        // Nivel C: INE (Instituto Nacional de Estadistica)
+                        advLog('Eurostat failed. Trying INE...');
                         fetch('https://servicios.ine.es/wstempus/js/ES/DATOS_SERIE/IPC251856?nult=1')
                             .then(r => { if (!r.ok) throw new Error('INE HTTP ' + r.status); return r.json(); })
-                            .then(() => {
-                                // INE no tiene endpoint directo de deuda publica - usar hardcoded actualizado
-                                throw new Error('INE sin endpoint de deuda');
-                            })
+                            .then(() => { throw new Error('INE sin endpoint de deuda'); })
                             .catch(() => {
-                                console.warn('[Deuda] INE fallido. Usando hardcoded.');
-                                // Nivel D: hardcoded (ultimo valor conocido)
+                                advLog('INE failed. Using hardcoded fallback.');
                                 setDeuda(34990, 'Hardcoded fallback');
                             });
                     });
