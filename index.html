@@ -345,18 +345,50 @@
 
         nodeInp.oninput = calculate;
 
+        // Cascada de fuentes de deuda: Nivel A -> B -> C -> D
+        const PIB_ESPANA = 1460000000000;
+        const ciudadanosDNI = 42327164;
+
+        function setDeuda(eur, fuente) {
+            document.getElementById('deuda-per-capita').innerText =
+                eur.toLocaleString('en-US', { style: 'currency', currency: 'EUR' });
+            console.log('[Deuda] Fuente: ' + fuente + ' -> ' + eur.toFixed(0) + ' EUR');
+        }
+
+        // Nivel A: API BdE BIEST (fuente primaria oficial)
         fetch('https://app.bde.es/bierest/resources/srdatosapp/favoritas?idioma=es&series=DTNPDE2010_P0000P_PS_APU')
-            .then(r => r.json())
+            .then(r => { if (!r.ok) throw new Error('BdE HTTP ' + r.status); return r.json(); })
             .then(data => {
-                const deudaPctPIB = data[0].valor;
-                const PIB_ESPANA = 1460000000000;
-                const ciudadanosDNI = 42327164;
-                const deudaPerCapita = (deudaPctPIB / 100 * PIB_ESPANA) / ciudadanosDNI;
-                document.getElementById('deuda-per-capita').innerText =
-                    deudaPerCapita.toLocaleString('en-US', { style: 'currency', currency: 'EUR' });
+                const pct = parseFloat(data[0].valor);
+                if (isNaN(pct)) throw new Error('BdE valor invalido');
+                setDeuda((pct / 100 * PIB_ESPANA) / ciudadanosDNI, 'BdE BIEST');
             })
             .catch(() => {
-                document.getElementById('deuda-per-capita').innerText = '~EUR 34,990';
+                console.warn('[Deuda] BdE fallido. Intentando Eurostat...');
+                // Nivel B: Eurostat SDMX (deuda publica Spain % PIB)
+                fetch('https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/gov_10dd_edpt1?geo=ES&na_item=GD&sector=S13&unit=PC_GDP&lastTimePeriod=1')
+                    .then(r => { if (!r.ok) throw new Error('Eurostat HTTP ' + r.status); return r.json(); })
+                    .then(data => {
+                        const values = Object.values(data.value);
+                        const pct = parseFloat(values[values.length - 1]);
+                        if (isNaN(pct)) throw new Error('Eurostat valor invalido');
+                        setDeuda((pct / 100 * PIB_ESPANA) / ciudadanosDNI, 'Eurostat SDMX');
+                    })
+                    .catch(() => {
+                        console.warn('[Deuda] Eurostat fallido. Intentando INE...');
+                        // Nivel C: INE (Instituto Nacional de Estadistica)
+                        fetch('https://servicios.ine.es/wstempus/js/ES/DATOS_SERIE/IPC251856?nult=1')
+                            .then(r => { if (!r.ok) throw new Error('INE HTTP ' + r.status); return r.json(); })
+                            .then(() => {
+                                // INE no tiene endpoint directo de deuda publica - usar hardcoded actualizado
+                                throw new Error('INE sin endpoint de deuda');
+                            })
+                            .catch(() => {
+                                console.warn('[Deuda] INE fallido. Usando hardcoded.');
+                                // Nivel D: hardcoded (ultimo valor conocido)
+                                setDeuda(34990, 'Hardcoded fallback');
+                            });
+                    });
             });
     </script>
 </body>
