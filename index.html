@@ -69,6 +69,13 @@
                 </div>
             </div>
 
+            <div class="border-t border-stone-800 pt-4">
+                <label class="text-[9px] font-bold uppercase gold-text block mb-1">Your name on the certificate <span class="opacity-40">(optional)</span>:</label>
+                <input type="text" id="cert-name" placeholder="Leave blank for anonymous"
+                    class="w-full bg-black border border-stone-600 p-2 text-sm font-mono text-stone-400 focus:outline-none focus:border-[#d4af37] rounded placeholder-stone-700">
+                <p class="text-[8px] text-stone-600 mt-1">Decorative only. Cryptographic value resides in the Nostr event ID.</p>
+            </div>
+
             <button id="btn-pay" class="w-full bg-[#d4af37] text-black py-4 font-black hover:bg-yellow-500 transition-all uppercase rounded text-sm tracking-widest">
                 Sign & Redeem Node
             </button>
@@ -80,6 +87,14 @@
             <div id="invoice-str" class="text-[7px] text-stone-400 break-all font-mono text-center select-all px-4"></div>
             <div id="error-console" class="hidden text-[8px] text-red-400 font-mono text-left bg-red-950 p-2 border border-red-800 rounded"></div>
             <div id="debug-log" class="hidden text-[7px] text-stone-500 font-mono text-left space-y-1 border-t border-stone-800 pt-2 mt-2"></div>
+            <div id="guide-download" class="hidden border-t border-stone-700 pt-4 text-center">
+                <p class="text-[9px] gold-text uppercase tracking-widest mb-3">Sovereign Stack — Recommended Reading</p>
+                <a href="guia_estrategica_sintropica.pdf" download
+                   class="inline-block border border-[#d4af37] text-[#d4af37] font-mono text-[10px] uppercase tracking-widest px-6 py-3 hover:bg-[#d4af37] hover:text-black transition-all">
+                    Download Sovereignty Guide →
+                </a>
+                <p class="text-[8px] text-stone-600 mt-2">Guia Estrategica Sintropica · NakamotoBook · CC BY-SA 4.0</p>
+            </div>
         </div>
 
         <footer class="text-[9px] uppercase tracking-widest space-y-1 gold-text opacity-70">
@@ -278,7 +293,14 @@
             doc.text("#" + nodeId, 105, 100, { align: "center" });
             doc.setFontSize(8); doc.setFont('courier', 'normal');
             doc.text("FOUNDER NODE", 105, 108, { align: "center" });
-            doc.line(20, 114, 190, 114);
+            const certName = document.getElementById('cert-name') ? document.getElementById('cert-name').value.trim() : '';
+            if (certName) {
+                doc.setFontSize(7); doc.setTextColor(180, 150, 60);
+                doc.text("Issued to: " + certName, 105, 115, { align: "center" });
+                doc.setTextColor(...gold); doc.line(20, 120, 190, 120);
+            } else {
+                doc.line(20, 114, 190, 114);
+            }
 
             const deuda = document.getElementById('deuda-per-capita').innerText || '~EUR 35,597';
             const block = document.getElementById('display-block').innerText || '---';
@@ -363,6 +385,8 @@
                             statusMsg.innerText = "PAYMENT CONFIRMED. GENERATING CONTRACT...";
                             log('Payment confirmed. Balance increased by ' + (balanceAhora - balanceAntes) + ' sats.');
                             await generateSovereignPDF(nodeId);
+                            // Show Sintropic Guide download
+                            document.getElementById('guide-download').classList.remove('hidden');
                             statusMsg.innerText = "CONTRACT ISSUED. SOVEREIGNTY CLAIMED.";
                             payBtn.disabled = false; payBtn.classList.remove('opacity-50');
                         }
