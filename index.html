@@ -49,7 +49,11 @@
 
         <div class="py-2 border-y border-stone-800">
             <p class="text-[9px] uppercase tracking-widest gold-text opacity-70">Global Inventory Status</p>
-            <div class="text-2xl font-black italic">499 / 500 AVAILABLE</div>
+            <div class="text-2xl font-black italic" id="inventory-display">--- / 500 AVAILABLE</div>
+            <div id="sold-nodes-row" class="hidden mt-2">
+                <p class="text-[8px] uppercase tracking-widest text-stone-500 mb-1">Claimed Nodes</p>
+                <div id="sold-nodes-list" class="flex flex-wrap gap-1 justify-center"></div>
+            </div>
         </div>
 
         <div class="cypher-bg p-6 rounded gold-border shadow-2xl space-y-6 text-left relative">
@@ -158,6 +162,70 @@
     </div>
 
     <script>
+        // --- INVENTORY CONFIG ---
+        // 1. Create a public Gist at https://gist.github.com with filename "satoshinostr-inventory.json"
+        //    and initial content: {"sold":[]}
+        // 2. Paste the Gist ID here (the long hex string in the Gist URL)
+        const GIST_ID = "6f8d077663126701055862201e36f95d";
+        const GIST_URL = `https://gist.githubusercontent.com/SatoshiNostr/${GIST_ID}/raw/satoshinostr-inventory.json`;
+
+        let soldNodes = [];
+
+        async function loadInventory() {
+            try {
+                const r = await fetch(GIST_URL + '?t=' + Date.now()); // cache-bust
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                soldNodes = Array.isArray(data.sold) ? data.sold : [];
+                renderInventory();
+                advLog('Inventory loaded: ' + soldNodes.length + ' nodes sold');
+            } catch(e) {
+                console.warn('Inventory fetch failed:', e.message);
+                advLog('Inventory unavailable: ' + e.message);
+                document.getElementById('inventory-display').innerText = '--- / 500 AVAILABLE';
+            }
+        }
+
+        function renderInventory() {
+            const available = 500 - soldNodes.length;
+            document.getElementById('inventory-display').innerText =
+                available.toLocaleString() + ' / 500 AVAILABLE';
+
+            const listEl = document.getElementById('sold-nodes-list');
+            const rowEl = document.getElementById('sold-nodes-row');
+
+            if (soldNodes.length === 0) {
+                rowEl.classList.add('hidden');
+                return;
+            }
+            rowEl.classList.remove('hidden');
+            listEl.innerHTML = '';
+            const sorted = [...soldNodes].sort((a, b) => a - b);
+            sorted.forEach(n => {
+                const badge = document.createElement('span');
+                badge.className = 'text-[8px] font-mono px-1 py-0.5 rounded border border-stone-700 text-stone-400 line-through';
+                badge.innerText = '#' + n;
+                listEl.appendChild(badge);
+            });
+
+            // Warn user if selected node is already sold
+            validateNodeSelection();
+        }
+
+        function validateNodeSelection() {
+            const n = parseInt(nodeInp.value);
+            const isSold = soldNodes.includes(n);
+            if (isSold) {
+                payBtn.disabled = true;
+                payBtn.classList.add('opacity-50');
+                payBtn.innerText = 'NODE ALREADY CLAIMED';
+            } else {
+                payBtn.disabled = false;
+                payBtn.classList.remove('opacity-50');
+                payBtn.innerText = 'Sign & Redeem Node';
+            }
+        }
+
         // --- BLINK API CONFIG ---
         const BLINK_API = "https://api.blink.sv/graphql";
         const BLINK_KEY = "blink_60dLEfMvlBw8z1ES3Gqh4Bh2ahhHjSmTGsEKABFpPSJLP6WiokWz8CYjK69kEW0V";
@@ -315,8 +383,9 @@
             }
             dataRow("EMISSION COST:", precio, y); y += lineH;
             dataRow("SOVEREIGN DEBT / CAPITA:", deuda, y); y += lineH;
-            dataRow("BITCOIN BLOCK:", block, y); y += lineH;
-            dataRow("EMISSION DATE:", new Date().toUTCString(), y); y += lineH;
+            dataRow("PAYMENT BLOCK:", block, y); y += lineH;
+            dataRow("PAYMENT UTC:", new Date().toUTCString(), y); y += lineH;
+            dataRow("NOSTR BLOCK:", "see event timestamp", y); y += lineH;
             dataRow("PROTOCOL:", "SatoshiNostr V1.0", y); y += lineH;
             dataRow("ALPHA PARAMETER:", "0.046144", y); y += lineH;
             dataRow("FORMULA:", "f(n) = 10^10 x exp(-0.046144 x (n-1))", y); y += lineH;
@@ -405,6 +474,7 @@
 
         window.onload = () => {
             calculate();
+            loadInventory();
             fetch('https://mempool.space/api/blocks/tip/height')
                 .then(r => r.text())
                 .then(h => {
@@ -415,7 +485,7 @@
             advLog('Mempool UTC: ' + new Date().toUTCString());
         };
 
-        nodeInp.oninput = calculate;
+        nodeInp.oninput = () => { calculate(); validateNodeSelection(); };
 
         // Cascada de fuentes de deuda: Nivel A -> B -> C -> D
         const PIB_ESPANA = 1460000000000;
