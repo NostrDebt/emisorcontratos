@@ -37,6 +37,20 @@
             word-break: break-all;
             white-space: pre-wrap;
         }
+        /* Estado del nodo en el input */
+        #node-status {
+            font-size: 9px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 4px;
+            min-height: 14px;
+        }
+        .status-claimed  { color: #ef4444; }
+        .status-available { color: #22c55e; }
+        .status-loading   { color: #888; }
+        /* Inventario dinámico */
+        #inventory-display { font-size: 1.5rem; font-weight: 900; font-style: italic; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4 text-center">
@@ -44,16 +58,13 @@
     <div class="max-w-xl w-full space-y-6">
         <header>
             <h1 class="text-3xl font-bold gold-text tracking-[0.2em] uppercase">SATOSHINOSTR</h1>
-            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.12</p>
+            <p class="text-[10px] italic opacity-60 font-bold uppercase">Sovereign Protocol v1.3.13</p>
         </header>
 
         <div class="py-2 border-y border-stone-800">
             <p class="text-[9px] uppercase tracking-widest gold-text opacity-70">Global Inventory Status</p>
-            <div class="text-2xl font-black italic" id="inventory-display">--- / 500 AVAILABLE</div>
-            <div id="sold-nodes-row" class="hidden mt-2">
-                <p class="text-[8px] uppercase tracking-widest text-stone-500 mb-1">Claimed Nodes</p>
-                <div id="sold-nodes-list" class="flex flex-wrap gap-1 justify-center"></div>
-            </div>
+            <div id="inventory-display">--- / 500 AVAILABLE</div>
+            <p id="inventory-sync" class="text-[8px] text-stone-600 mt-1">Syncing with Nostr relay...</p>
         </div>
 
         <div class="cypher-bg p-6 rounded gold-border shadow-2xl space-y-6 text-left relative">
@@ -66,6 +77,7 @@
                     <label class="text-[9px] font-bold uppercase gold-text block mb-1">Founder Node (1-500):</label>
                     <input type="number" id="node-selector" value="494" min="1" max="500"
                         class="w-full bg-black border border-stone-600 p-2 text-xl font-mono gold-text focus:outline-none focus:border-[#d4af37] rounded">
+                    <div id="node-status" class="status-loading">Checking relay...</div>
                 </div>
                 <div class="text-right">
                     <p class="text-[9px] font-bold uppercase gold-text">Emission Cost:</p>
@@ -128,6 +140,8 @@
                     <div class="param-row"><span class="param-label">Node #499 Cost</span><span class="param-value">1 SAT</span></div>
                     <div class="param-row"><span class="param-label">Selected Node</span><span class="param-value" id="adv-node">---</span></div>
                     <div class="param-row"><span class="param-label">Selected Cost</span><span class="param-value" id="adv-price">---</span></div>
+                    <div class="param-row"><span class="param-label">Claimed Nodes</span><span class="param-value" id="adv-claimed">syncing...</span></div>
+                    <div class="param-row"><span class="param-label">Relay Source</span><span class="param-value">wss://relay.damus.io</span></div>
                     <div class="param-row"><span class="param-label">Debt Source</span><span class="param-value">Banco de Espana BIEST API</span></div>
                     <div class="param-row"><span class="param-label">Debt Fallback</span><span class="param-value">Eurostat -> INE -> 34,990 EUR</span></div>
                     <div class="param-row"><span class="param-label">Lightning Backend</span><span class="param-value">Blink GraphQL API</span></div>
@@ -162,97 +176,210 @@
     </div>
 
     <script>
-        // --- INVENTORY CONFIG ---
-        // 1. Create a public Gist at https://gist.github.com with filename "satoshinostr-inventory.json"
-        //    and initial content: {"sold":[]}
-        // 2. Paste the Gist ID here (the long hex string in the Gist URL)
-        const GIST_ID = "6f8d077663126701055862201e36f95d";
-        const GIST_URL = `https://gist.githubusercontent.com/SatoshiNostr/${GIST_ID}/raw/satoshinostr-inventory.json`;
+        // ─── CONFIG ───────────────────────────────────────────────────────────────
+        const BLINK_API  = "https://api.blink.sv/graphql";
+        const BLINK_KEY  = "blink_60dLEfMvlBw8z1ES3Gqh4Bh2ahhHjSmTGsEKABFpPSJLP6WiokWz8CYjK69kEW0V";
+        const WALLET_ID  = "244ec87a-2931-4662-80ce-0f131b2a9609";
+        const ORACLE_PUBKEY = "976baa6f835c2d07d2ca79d470f190d04187e7ed51a05a3120dcc4772219e470";
+        const NOSTR_RELAYS = [
+            "wss://relay.damus.io",
+            "wss://nos.lol",
+            "wss://relay.nostr.band"
+        ];
 
-        let soldNodes = [];
+        // ─── CLAIMED NODES — fuente de verdad dinámica ────────────────────────────
+        // Se puebla leyendo Kind 30068 del oracle pubkey en los relays Nostr.
+        // Nunca hardcodeado. La app es un espejo de lo que está en Nostr.
+        const claimedNodes = new Set();
+        let relayReady = false;
 
-        async function loadInventory() {
-            try {
-                const r = await fetch(GIST_URL + '?t=' + Date.now()); // cache-bust
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                const data = await r.json();
-                soldNodes = Array.isArray(data.sold) ? data.sold : [];
-                renderInventory();
-                advLog('Inventory loaded: ' + soldNodes.length + ' nodes sold');
-            } catch(e) {
-                console.warn('Inventory fetch failed:', e.message);
-                advLog('Inventory unavailable: ' + e.message);
-                document.getElementById('inventory-display').innerText = '--- / 500 AVAILABLE';
-            }
-        }
+        // ─── DOM ──────────────────────────────────────────────────────────────────
+        const nodeInp      = document.getElementById('node-selector');
+        const priceOut     = document.getElementById('current-price');
+        const payBtn       = document.getElementById('btn-pay');
+        const statusMsg    = document.getElementById('status-msg');
+        const errCons      = document.getElementById('error-console');
+        const debugLog     = document.getElementById('debug-log');
+        const advLogEl     = document.getElementById('advanced-log');
+        const nodeStatus   = document.getElementById('node-status');
 
-        function renderInventory() {
-            const available = 500 - soldNodes.length;
-            document.getElementById('inventory-display').innerText =
-                available.toLocaleString() + ' / 500 AVAILABLE';
-
-            const listEl = document.getElementById('sold-nodes-list');
-            const rowEl = document.getElementById('sold-nodes-row');
-
-            if (soldNodes.length === 0) {
-                rowEl.classList.add('hidden');
-                return;
-            }
-            rowEl.classList.remove('hidden');
-            listEl.innerHTML = '';
-            const sorted = [...soldNodes].sort((a, b) => a - b);
-            sorted.forEach(n => {
-                const badge = document.createElement('span');
-                badge.className = 'text-[8px] font-mono px-1 py-0.5 rounded border border-stone-700 text-stone-400 line-through';
-                badge.innerText = '#' + n;
-                listEl.appendChild(badge);
-            });
-
-            // Warn user if selected node is already sold
-            validateNodeSelection();
-        }
-
-        function validateNodeSelection() {
-            const n = parseInt(nodeInp.value);
-            const isSold = soldNodes.includes(n);
-            if (isSold) {
-                payBtn.disabled = true;
-                payBtn.classList.add('opacity-50');
-                payBtn.innerText = 'NODE ALREADY CLAIMED';
-            } else {
-                payBtn.disabled = false;
-                payBtn.classList.remove('opacity-50');
-                payBtn.innerText = 'Sign & Redeem Node';
-            }
-        }
-
-        // --- BLINK API CONFIG ---
-        const BLINK_API = "https://api.blink.sv/graphql";
-        const BLINK_KEY = "blink_60dLEfMvlBw8z1ES3Gqh4Bh2ahhHjSmTGsEKABFpPSJLP6WiokWz8CYjK69kEW0V";
-        const WALLET_ID = "244ec87a-2931-4662-80ce-0f131b2a9609";
-
-        const nodeInp = document.getElementById('node-selector');
-        const priceOut = document.getElementById('current-price');
-        const payBtn = document.getElementById('btn-pay');
-        const statusMsg = document.getElementById('status-msg');
-        const errCons = document.getElementById('error-console');
-        const debugLog = document.getElementById('debug-log');
-        const advLogEl = document.getElementById('advanced-log');
-
-        // --- ADVANCED MODE ---
-        let advancedOpen = false;
-        document.getElementById('toggle-advanced').onclick = () => {
-            advancedOpen = !advancedOpen;
-            document.getElementById('advanced-panel').classList.toggle('open', advancedOpen);
-            document.getElementById('toggle-label').innerText = advancedOpen ? '[ - Simple Mode ]' : '[ + Advanced Mode ]';
-            if (advancedOpen) updateAdvancedPanel();
-        };
-
+        // ─── LOGGING ──────────────────────────────────────────────────────────────
         function advLog(msg) {
             const line = document.createElement('p');
             line.innerText = '> ' + msg;
             advLogEl.appendChild(line);
         }
+        function log(msg) {
+            const line = document.createElement('p');
+            line.innerText = '> ' + msg;
+            debugLog.appendChild(line);
+            debugLog.classList.remove('hidden');
+            advLog(msg);
+            console.log(msg);
+        }
+
+        // ─── NOSTR RELAY — leer Kind 30068 del oracle ─────────────────────────────
+        // Intentamos cada relay en orden hasta que uno responda.
+        // Cuando llega EOSE (End Of Stored Events) el inventario está completo.
+        function loadClaimedNodesFromNostr() {
+            let relayIndex = 0;
+
+            function tryRelay(index) {
+                if (index >= NOSTR_RELAYS.length) {
+                    // Todos los relays fallaron — la app sigue funcionando
+                    // pero no podemos verificar nodos. Mostramos aviso.
+                    advLog('All relays failed. Inventory unavailable.');
+                    document.getElementById('inventory-sync').innerText =
+                        'Relay unavailable. Node availability unverified.';
+                    document.getElementById('inventory-sync').style.color = '#ef4444';
+                    nodeStatus.innerText = 'Relay unavailable';
+                    nodeStatus.className = 'status-loading';
+                    relayReady = true; // dejamos operar igual
+                    updateInventoryDisplay();
+                    return;
+                }
+
+                const relayUrl = NOSTR_RELAYS[index];
+                advLog('Connecting to ' + relayUrl + '...');
+
+                let ws;
+                try {
+                    ws = new WebSocket(relayUrl);
+                } catch(e) {
+                    advLog(relayUrl + ' failed: ' + e.message);
+                    tryRelay(index + 1);
+                    return;
+                }
+
+                const timeout = setTimeout(() => {
+                    advLog(relayUrl + ' timeout. Trying next...');
+                    ws.close();
+                    tryRelay(index + 1);
+                }, 8000);
+
+                ws.onopen = () => {
+                    clearTimeout(timeout);
+                    advLog('Connected to ' + relayUrl + '. Requesting Kind 30068...');
+                    // Pedimos TODOS los eventos Kind 30068 del oracle pubkey
+                    const req = JSON.stringify([
+                        "REQ", "claimed-nodes-sub",
+                        { kinds: [30068], authors: [ORACLE_PUBKEY] }
+                    ]);
+                    ws.send(req);
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        const type = msg[0];
+
+                        if (type === "EVENT") {
+                            const nostrEvent = msg[2];
+                            // Extraer número de nodo del tag "numero"
+                            const numeroTag = nostrEvent.tags.find(t => t[0] === "numero");
+                            if (numeroTag) {
+                                const nodeNum = parseInt(numeroTag[1]);
+                                if (!isNaN(nodeNum) && nodeNum >= 1 && nodeNum <= 500) {
+                                    const isNew = !claimedNodes.has(nodeNum);
+                                    claimedNodes.add(nodeNum);
+                                    if (isNew) {
+                                        advLog('Node #' + nodeNum + ' claimed (event ' + nostrEvent.id.substring(0,8) + '...)');
+                                        updateInventoryDisplay();
+                                        updateNodeStatus(); // refrescar si es el nodo seleccionado
+                                    }
+                                }
+                            }
+                        }
+
+                        if (type === "EOSE") {
+                            // End Of Stored Events — inventario inicial completo
+                            relayReady = true;
+                            advLog('EOSE received. ' + claimedNodes.size + ' nodes claimed. Relay: ' + relayUrl);
+                            document.getElementById('inventory-sync').innerText =
+                                'Live · ' + relayUrl.replace('wss://', '');
+                            document.getElementById('inventory-sync').style.color = '#22c55e';
+                            document.getElementById('adv-claimed').innerText =
+                                claimedNodes.size + ' / 500 (' + [...claimedNodes].sort((a,b)=>a-b).join(', ') + ')';
+                            updateInventoryDisplay();
+                            updateNodeStatus();
+                            // Mantener la conexión abierta para recibir nuevos eventos en tiempo real
+                        }
+
+                        if (type === "NOTICE") {
+                            advLog('Relay notice: ' + msg[1]);
+                        }
+
+                    } catch(e) {
+                        advLog('Parse error: ' + e.message);
+                    }
+                };
+
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    advLog(relayUrl + ' error. Trying next...');
+                    tryRelay(index + 1);
+                };
+
+                ws.onclose = (e) => {
+                    if (!relayReady) {
+                        clearTimeout(timeout);
+                        advLog(relayUrl + ' closed before EOSE. Trying next...');
+                        tryRelay(index + 1);
+                    } else {
+                        // Reconexión automática si se cae el relay activo
+                        advLog('Relay disconnected. Reconnecting in 10s...');
+                        setTimeout(() => tryRelay(index), 10000);
+                    }
+                };
+            }
+
+            tryRelay(0);
+        }
+
+        // ─── INVENTARIO ───────────────────────────────────────────────────────────
+        function updateInventoryDisplay() {
+            const available = 500 - claimedNodes.size;
+            document.getElementById('inventory-display').innerText =
+                available + ' / 500 AVAILABLE';
+        }
+
+        // ─── ESTADO DEL NODO SELECCIONADO ─────────────────────────────────────────
+        function updateNodeStatus() {
+            const n = parseInt(nodeInp.value);
+            if (isNaN(n) || n < 1 || n > 500) {
+                nodeStatus.innerText = 'Invalid node number';
+                nodeStatus.className = 'status-loading';
+                return;
+            }
+            if (!relayReady) {
+                nodeStatus.innerText = 'Checking relay...';
+                nodeStatus.className = 'status-loading';
+                return;
+            }
+            if (claimedNodes.has(n)) {
+                nodeStatus.innerText = '✗ Already Claimed';
+                nodeStatus.className = 'status-claimed';
+                payBtn.disabled = true;
+                payBtn.classList.add('opacity-50');
+                payBtn.title = 'Node #' + n + ' has already been claimed.';
+            } else {
+                nodeStatus.innerText = '✓ Available';
+                nodeStatus.className = 'status-available';
+                payBtn.disabled = false;
+                payBtn.classList.remove('opacity-50');
+                payBtn.title = '';
+            }
+        }
+
+        // ─── ADVANCED MODE ────────────────────────────────────────────────────────
+        let advancedOpen = false;
+        document.getElementById('toggle-advanced').onclick = () => {
+            advancedOpen = !advancedOpen;
+            document.getElementById('advanced-panel').classList.toggle('open', advancedOpen);
+            document.getElementById('toggle-label').innerText =
+                advancedOpen ? '[ - Simple Mode ]' : '[ + Advanced Mode ]';
+            if (advancedOpen) updateAdvancedPanel();
+        };
 
         function updateNostrJSON(nodeId) {
             const deuda = document.getElementById('deuda-per-capita').innerText;
@@ -271,7 +398,7 @@
                     ["block_height", block]
                 ],
                 content: "Contrato #" + nodeId + " - Protocolo SatoshiNostr - Declaracion de Soberania",
-                pubkey: "976baa6f835c2d07d2ca79d470f190d04187e7ed51a05a3120dcc4772219e470"
+                pubkey: ORACLE_PUBKEY
             };
             document.getElementById('nostr-json-preview').innerText = JSON.stringify(preview, null, 2);
         }
@@ -280,18 +407,14 @@
             const n = parseInt(nodeInp.value) || 494;
             document.getElementById('adv-node').innerText = '#' + n;
             document.getElementById('adv-price').innerText = priceOut.innerText;
+            document.getElementById('adv-claimed').innerText =
+                relayReady
+                    ? claimedNodes.size + ' / 500 (' + [...claimedNodes].sort((a,b)=>a-b).join(', ') + ')'
+                    : 'syncing...';
             updateNostrJSON(n);
         }
 
-        function log(msg) {
-            const line = document.createElement('p');
-            line.innerText = '> ' + msg;
-            debugLog.appendChild(line);
-            debugLog.classList.remove('hidden');
-            advLog(msg);
-            console.log(msg);
-        }
-
+        // ─── PRECIO ───────────────────────────────────────────────────────────────
         function calculate() {
             let n = parseInt(nodeInp.value);
             if (isNaN(n) || n < 1 || n > 500) return 0;
@@ -302,10 +425,12 @@
             priceOut.innerText = sats >= 100000000
                 ? (sats / 100000000).toFixed(4) + " BTC"
                 : sats.toLocaleString() + " SATS";
+            updateNodeStatus();
             if (advancedOpen) updateAdvancedPanel();
             return sats;
         }
 
+        // ─── BLINK API ────────────────────────────────────────────────────────────
         async function blinkQuery(query, variables = {}) {
             const response = await fetch(BLINK_API, {
                 method: 'POST',
@@ -328,7 +453,9 @@
                     }
                 }
             `;
-            const data = await blinkQuery(query, { input: { walletId: WALLET_ID, amount: sats, memo: memo } });
+            const data = await blinkQuery(query, {
+                input: { walletId: WALLET_ID, amount: sats, memo: memo }
+            });
             if (data.lnInvoiceCreate.errors && data.lnInvoiceCreate.errors.length > 0) {
                 throw new Error(data.lnInvoiceCreate.errors[0].message);
             }
@@ -342,6 +469,7 @@
             return wallets.find(w => w.walletCurrency === 'BTC').balance;
         }
 
+        // ─── PDF ──────────────────────────────────────────────────────────────────
         async function generateSovereignPDF(nodeId, nostrEventId) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -361,7 +489,9 @@
             doc.text("#" + nodeId, 105, 100, { align: "center" });
             doc.setFontSize(8); doc.setFont('courier', 'normal');
             doc.text("FOUNDER NODE", 105, 108, { align: "center" });
-            const certName = document.getElementById('cert-name') ? document.getElementById('cert-name').value.trim() : '';
+
+            const certName = document.getElementById('cert-name')
+                ? document.getElementById('cert-name').value.trim() : '';
             if (certName) {
                 doc.setFontSize(7); doc.setTextColor(180, 150, 60);
                 doc.text("Issued to: " + certName, 105, 115, { align: "center" });
@@ -372,8 +502,10 @@
 
             const deuda = document.getElementById('deuda-per-capita').innerText || '~EUR 35,597';
             const block = document.getElementById('display-block').innerText || '---';
-            const sats = calculate();
-            const precio = sats >= 100000000 ? (sats/100000000).toFixed(4)+' BTC' : sats.toLocaleString()+' SATS';
+            const sats  = calculate();
+            const precio = sats >= 100000000
+                ? (sats / 100000000).toFixed(4) + ' BTC'
+                : sats.toLocaleString() + ' SATS';
 
             doc.setFontSize(8); doc.setTextColor(...gold);
             let y = 126; const lineH = 10;
@@ -381,15 +513,14 @@
                 doc.setFont('courier', 'bold'); doc.text(label, 25, yPos);
                 doc.setFont('courier', 'normal'); doc.text(value, 105, yPos);
             }
-            dataRow("EMISSION COST:", precio, y); y += lineH;
-            dataRow("SOVEREIGN DEBT / CAPITA:", deuda, y); y += lineH;
-            dataRow("PAYMENT BLOCK:", block, y); y += lineH;
-            dataRow("PAYMENT UTC:", new Date().toUTCString(), y); y += lineH;
-            dataRow("NOSTR BLOCK:", "see event timestamp", y); y += lineH;
-            dataRow("PROTOCOL:", "SatoshiNostr V1.0", y); y += lineH;
-            dataRow("ALPHA PARAMETER:", "0.046144", y); y += lineH;
-            dataRow("FORMULA:", "f(n) = 10^10 x exp(-0.046144 x (n-1))", y); y += lineH;
-            dataRow("SOURCE:", "Banco de Espana BIEST API", y); y += lineH;
+            dataRow("EMISSION COST:",           precio, y); y += lineH;
+            dataRow("SOVEREIGN DEBT / CAPITA:", deuda, y);  y += lineH;
+            dataRow("BITCOIN BLOCK:",            block, y);  y += lineH;
+            dataRow("EMISSION DATE:",            new Date().toUTCString(), y); y += lineH;
+            dataRow("PROTOCOL:",                 "SatoshiNostr V1.0", y); y += lineH;
+            dataRow("ALPHA PARAMETER:",          "0.046144", y); y += lineH;
+            dataRow("FORMULA:",                  "f(n) = 10^10 x exp(-0.046144 x (n-1))", y); y += lineH;
+            dataRow("SOURCE:",                   "Banco de Espana BIEST API", y); y += lineH;
 
             y += 4; doc.line(20, y, 190, y); y += 10;
             doc.setFontSize(7); doc.setFont('courier', 'bold');
@@ -414,10 +545,19 @@
             doc.save("SatoshiNostr_Sovereign_Node_" + nodeId + ".pdf");
         }
 
+        // ─── PAGO ─────────────────────────────────────────────────────────────────
         payBtn.onclick = async () => {
+            const nodeId = parseInt(nodeInp.value);
+
+            // Guardia doble: verificar en el momento de clic
+            if (claimedNodes.has(nodeId)) {
+                alert('Node #' + nodeId + ' has already been claimed. Choose another node.');
+                return;
+            }
+
             const amt = calculate();
             if (amt === 0) { alert('Select a valid node between 1 and 500.'); return; }
-            const nodeId = parseInt(nodeInp.value);
+
             document.getElementById('payment-area').classList.remove('hidden');
             errCons.classList.add('hidden');
             debugLog.innerHTML = '';
@@ -436,7 +576,8 @@
                 const balanceAntes = await checkPayment();
                 log('Balance before payment: ' + balanceAntes + ' sats');
                 log('Waiting for payment confirmation...');
-                let attempts = 0; const maxAttempts = 120;
+                let attempts = 0;
+                const maxAttempts = 120;
 
                 const check = setInterval(async () => {
                     attempts++;
@@ -452,9 +593,15 @@
                         if (balanceAhora > balanceAntes) {
                             clearInterval(check);
                             statusMsg.innerText = "PAYMENT CONFIRMED. GENERATING CONTRACT...";
-                            log('Payment confirmed. Balance increased by ' + (balanceAhora - balanceAntes) + ' sats.');
+                            log('Payment confirmed. +'  + (balanceAhora - balanceAntes) + ' sats.');
+
+                            // Marcar nodo como claimed localmente de inmediato
+                            // (el relay lo actualizará cuando fundador.js publique el Kind 30068)
+                            claimedNodes.add(nodeId);
+                            updateInventoryDisplay();
+                            updateNodeStatus();
+
                             await generateSovereignPDF(nodeId);
-                            // Show Sintropic Guide download
                             document.getElementById('guide-download').classList.remove('hidden');
                             statusMsg.innerText = "CONTRACT ISSUED. SOVEREIGNTY CLAIMED.";
                             payBtn.disabled = false; payBtn.classList.remove('opacity-50');
@@ -472,23 +619,31 @@
             }
         };
 
+        // ─── INIT ─────────────────────────────────────────────────────────────────
         window.onload = () => {
             calculate();
-            loadInventory();
+            updateInventoryDisplay(); // mostrar "--- / 500" mientras sincroniza
+
+            // Block height
             fetch('https://mempool.space/api/blocks/tip/height')
                 .then(r => r.text())
                 .then(h => {
                     document.getElementById('display-block').innerText = h;
                     advLog('Block height: ' + h);
-                });
+                })
+                .catch(() => advLog('mempool.space unavailable'));
+
             document.getElementById('mempool-time').innerText = new Date().toUTCString();
             advLog('Mempool UTC: ' + new Date().toUTCString());
+
+            // Cargar nodos reclamados desde Nostr
+            loadClaimedNodesFromNostr();
         };
 
-        nodeInp.oninput = () => { calculate(); validateNodeSelection(); };
+        nodeInp.oninput = calculate;
 
-        // Cascada de fuentes de deuda: Nivel A -> B -> C -> D
-        const PIB_ESPANA = 1460000000000;
+        // ─── DEUDA PER CAPITA — cascada 4 niveles ────────────────────────────────
+        const PIB_ESPANA    = 1460000000000;
         const ciudadanosDNI = 42327164;
 
         function setDeuda(eur, fuente) {
