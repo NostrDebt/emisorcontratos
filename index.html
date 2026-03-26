@@ -62,8 +62,9 @@
         </header>
 
         <div class="py-2 border-y border-stone-800">
-            <p class="text-[9px] uppercase tracking-widest gold-text opacity-70">Global Inventory Status</p>
+            <p class="text-[9px] uppercase tracking-widest gold-text opacity-70">Global Status</p>
             <div id="inventory-display">--- / 500 AVAILABLE</div>
+            <div id="claimed-display" class="text-[9px] mt-1 min-h-[14px]"></div>
             <p id="inventory-sync" class="text-[8px] text-stone-600 mt-1">Syncing with Nostr relay...</p>
         </div>
 
@@ -184,7 +185,11 @@
         const NOSTR_RELAYS = [
             "wss://relay.damus.io",
             "wss://nos.lol",
-            "wss://relay.nostr.band"
+            "wss://relay.nostr.band",
+            "wss://nostr.wine",
+            "wss://relay.primal.net",
+            "wss://nostr-pub.wellorder.net",
+            "wss://relay.snort.social"
         ];
 
         // ─── CLAIMED NODES — fuente de verdad dinámica ────────────────────────────
@@ -219,53 +224,44 @@
         }
 
         // ─── NOSTR RELAY — leer Kind 30068 del oracle ─────────────────────────────
-        // Intentamos cada relay en orden hasta que uno responda.
-        // Cuando llega EOSE (End Of Stored Events) el inventario está completo.
+        // Estrategia PARALELA: todos los relays se conectan a la vez.
+        // El primero en responder EOSE activa el inventario.
+        // Los demás siguen abiertos como redundancia en tiempo real.
+        // Fallback: si todos fallan tras 12s, la app sigue operando con aviso.
         function loadClaimedNodesFromNostr() {
-            let relayIndex = 0;
+            let eoseReceived = false;
+            let failCount = 0;
 
-            function tryRelay(index) {
-                if (index >= NOSTR_RELAYS.length) {
-                    // Todos los relays fallaron — la app sigue funcionando
-                    // pero no podemos verificar nodos. Mostramos aviso.
-                    advLog('All relays failed. Inventory unavailable.');
+            // Fallback global: si tras 12s ningún relay respondió EOSE
+            const globalTimeout = setTimeout(() => {
+                if (!eoseReceived) {
+                    advLog('All relays timeout. Inventory unavailable.');
                     document.getElementById('inventory-sync').innerText =
                         'Relay unavailable. Node availability unverified.';
                     document.getElementById('inventory-sync').style.color = '#ef4444';
                     nodeStatus.innerText = 'Relay unavailable';
                     nodeStatus.className = 'status-loading';
-                    relayReady = true; // dejamos operar igual
+                    relayReady = true;
                     updateInventoryDisplay();
-                    return;
                 }
+            }, 12000);
 
-                const relayUrl = NOSTR_RELAYS[index];
+            NOSTR_RELAYS.forEach(relayUrl => {
                 advLog('Connecting to ' + relayUrl + '...');
-
                 let ws;
                 try {
                     ws = new WebSocket(relayUrl);
                 } catch(e) {
                     advLog(relayUrl + ' failed: ' + e.message);
-                    tryRelay(index + 1);
                     return;
                 }
 
-                const timeout = setTimeout(() => {
-                    advLog(relayUrl + ' timeout. Trying next...');
-                    ws.close();
-                    tryRelay(index + 1);
-                }, 8000);
-
                 ws.onopen = () => {
-                    clearTimeout(timeout);
-                    advLog('Connected to ' + relayUrl + '. Requesting Kind 30068...');
-                    // Pedimos TODOS los eventos Kind 30068 del oracle pubkey
-                    const req = JSON.stringify([
+                    advLog('Connected: ' + relayUrl);
+                    ws.send(JSON.stringify([
                         "REQ", "claimed-nodes-sub",
                         { kinds: [30068], authors: [ORACLE_PUBKEY] }
-                    ]);
-                    ws.send(req);
+                    ]));
                 };
 
                 ws.onmessage = (event) => {
@@ -275,7 +271,6 @@
 
                         if (type === "EVENT") {
                             const nostrEvent = msg[2];
-                            // Extraer número de nodo del tag "numero"
                             const numeroTag = nostrEvent.tags.find(t => t[0] === "numero");
                             if (numeroTag) {
                                 const nodeNum = parseInt(numeroTag[1]);
@@ -283,57 +278,88 @@
                                     const isNew = !claimedNodes.has(nodeNum);
                                     claimedNodes.add(nodeNum);
                                     if (isNew) {
-                                        advLog('Node #' + nodeNum + ' claimed (event ' + nostrEvent.id.substring(0,8) + '...)');
+                                        advLog('Node #' + nodeNum + ' claimed via ' + relayUrl.replace('wss://',''));
                                         updateInventoryDisplay();
-                                        updateNodeStatus(); // refrescar si es el nodo seleccionado
+                                        updateNodeStatus();
                                     }
                                 }
                             }
                         }
 
                         if (type === "EOSE") {
-                            // End Of Stored Events — inventario inicial completo
-                            relayReady = true;
-                            advLog('EOSE received. ' + claimedNodes.size + ' nodes claimed. Relay: ' + relayUrl);
-                            document.getElementById('inventory-sync').innerText =
-                                'Live · ' + relayUrl.replace('wss://', '');
-                            document.getElementById('inventory-sync').style.color = '#22c55e';
-                            document.getElementById('adv-claimed').innerText =
-                                claimedNodes.size + ' / 500 (' + [...claimedNodes].sort((a,b)=>a-b).join(', ') + ')';
-                            updateInventoryDisplay();
-                            updateNodeStatus();
-                            // Mantener la conexión abierta para recibir nuevos eventos en tiempo real
+                            advLog('EOSE from ' + relayUrl.replace('wss://','') + '. Nodes: ' + claimedNodes.size);
+                            if (!eoseReceived) {
+                                // Primer relay en confirmar — activar inventario
+                                eoseReceived = true;
+                                relayReady = true;
+                                clearTimeout(globalTimeout);
+                                document.getElementById('inventory-sync').innerText =
+                                    'Live · ' + relayUrl.replace('wss://', '');
+                                document.getElementById('inventory-sync').style.color = '#22c55e';
+                                document.getElementById('adv-claimed').innerText =
+                                    claimedNodes.size + ' / 500 (' + [...claimedNodes].sort((a,b)=>a-b).join(', ') + ')';
+                                updateInventoryDisplay();
+                                updateNodeStatus();
+                            }
                         }
 
                         if (type === "NOTICE") {
-                            advLog('Relay notice: ' + msg[1]);
+                            advLog('Notice ' + relayUrl.replace('wss://','') + ': ' + msg[1]);
                         }
 
                     } catch(e) {
-                        advLog('Parse error: ' + e.message);
+                        advLog('Parse error (' + relayUrl.replace('wss://','') + '): ' + e.message);
                     }
                 };
 
                 ws.onerror = () => {
-                    clearTimeout(timeout);
-                    advLog(relayUrl + ' error. Trying next...');
-                    tryRelay(index + 1);
+                    advLog(relayUrl.replace('wss://','') + ' error.');
                 };
 
-                ws.onclose = (e) => {
-                    if (!relayReady) {
-                        clearTimeout(timeout);
-                        advLog(relayUrl + ' closed before EOSE. Trying next...');
-                        tryRelay(index + 1);
-                    } else {
-                        // Reconexión automática si se cae el relay activo
-                        advLog('Relay disconnected. Reconnecting in 10s...');
-                        setTimeout(() => tryRelay(index), 10000);
+                ws.onclose = () => {
+                    if (eoseReceived) {
+                        // Reconectar relay caído silenciosamente
+                        setTimeout(() => {
+                            advLog('Reconnecting ' + relayUrl.replace('wss://','') + '...');
+                            loadSingleRelay(relayUrl);
+                        }, 15000);
                     }
                 };
-            }
+            });
 
-            tryRelay(0);
+            // Reconexión individual de un relay caído
+            function loadSingleRelay(relayUrl) {
+                let ws;
+                try { ws = new WebSocket(relayUrl); } catch(e) { return; }
+                ws.onopen = () => {
+                    ws.send(JSON.stringify([
+                        "REQ", "claimed-nodes-sub",
+                        { kinds: [30068], authors: [ORACLE_PUBKEY] }
+                    ]));
+                };
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        if (msg[0] === "EVENT") {
+                            const nostrEvent = msg[2];
+                            const numeroTag = nostrEvent.tags.find(t => t[0] === "numero");
+                            if (numeroTag) {
+                                const nodeNum = parseInt(numeroTag[1]);
+                                if (!isNaN(nodeNum) && nodeNum >= 1 && nodeNum <= 500) {
+                                    if (!claimedNodes.has(nodeNum)) {
+                                        claimedNodes.add(nodeNum);
+                                        updateInventoryDisplay();
+                                        updateNodeStatus();
+                                    }
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                };
+                ws.onclose = () => {
+                    setTimeout(() => loadSingleRelay(relayUrl), 15000);
+                };
+            }
         }
 
         // ─── INVENTARIO ───────────────────────────────────────────────────────────
@@ -341,6 +367,17 @@
             const available = 500 - claimedNodes.size;
             document.getElementById('inventory-display').innerText =
                 available + ' / 500 AVAILABLE';
+
+            const claimedEl = document.getElementById('claimed-display');
+            if (claimedNodes.size > 0) {
+                const sorted = Array.from(claimedNodes).sort((a, b) => a - b);
+                const badges = sorted.map(n =>
+                    '<span style="color:#ef4444;font-weight:900;background:#1a0000;border:1px solid #ef4444;padding:1px 6px;border-radius:2px;margin:0 2px;font-family:\'Courier New\',monospace;">#' + n + '</span>'
+                ).join('');
+                claimedEl.innerHTML = '<span style="color:#888;font-size:8px;text-transform:uppercase;letter-spacing:0.1em;">Claimed: </span>' + badges;
+            } else {
+                claimedEl.innerHTML = '';
+            }
         }
 
         // ─── ESTADO DEL NODO SELECCIONADO ─────────────────────────────────────────
