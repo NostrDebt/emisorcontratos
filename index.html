@@ -456,7 +456,7 @@
             let n = parseInt(nodeInp.value);
             if (isNaN(n) || n < 1 || n > 500) return 0;
             const start = 10000000000;
-            const decay = 0.046145;
+            const decay = 0.046144;
             let sats = Math.ceil(start * Math.exp(-decay * (n - 1)));
             if (n >= 499) sats = 1;
             priceOut.innerText = sats >= 100000000
@@ -585,7 +585,19 @@
         // ─── PAGO ─────────────────────────────────────────────────────────────────
         payBtn.onclick = async () => {
             const nodeId = parseInt(nodeInp.value);
-
+            // Verificar que el precio calculado es coherente con el nodo seleccionado
+            const precioEsperado = Math.ceil(10000000000 * Math.exp(-0.046144 * (nodeId - 1)));
+            const precioMostrado = calculate();
+            if (Math.abs(precioEsperado - precioMostrado) > 1) {
+            alert('Error de precio. Recarga la página e inténtalo de nuevo.');
+            payBtn.disabled = false;
+            return;
+            }
+            const statusEl = document.getElementById('node-status');
+            if (statusEl && statusEl.classList.contains('status-claimed')) {
+            alert('Este nodo ya está reclamado. Elige otro número.');
+            return;
+            }
             // Guardia doble: verificar en el momento de clic
             if (claimedNodes.has(nodeId)) {
                 alert('Node #' + nodeId + ' has already been claimed. Choose another node.');
@@ -638,7 +650,7 @@
                             updateInventoryDisplay();
                             updateNodeStatus();
 
-                            await generateSovereignPDF(nodeId);
+                            await generateSovereignPDF(nodeId, 'PENDING - Verify on-chain after protocol confirmation');
                             document.getElementById('guide-download').classList.remove('hidden');
                             statusMsg.innerText = "CONTRACT ISSUED. SOVEREIGNTY CLAIMED.";
                             payBtn.disabled = false; payBtn.classList.remove('opacity-50');
