@@ -246,6 +246,29 @@
                 }
             }, 12000);
 
+            // ─── SEED DESDE INVENTORY.JSON ───────────────────────────────────────
+            // Carga el inventario como mínimo garantizado antes de que lleguen los relays.
+            // Nostr puede añadir más nodos encima, nunca quitar.
+            fetch('https://raw.githubusercontent.com/SatoshiNostr/SatoshiNostr.github.io/main/inventory.json?t=' + Date.now())
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(data => {
+                    if (Array.isArray(data.sold)) {
+                        let added = 0;
+                        data.sold.forEach(n => {
+                            if (!claimedNodes.has(n)) {
+                                claimedNodes.add(n);
+                                added++;
+                                advLog('Node #' + n + ' seeded from inventory.json');
+                            }
+                        });
+                        if (added > 0) {
+                            updateInventoryDisplay();
+                            updateNodeStatus();
+                        }
+                    }
+                })
+                .catch(() => advLog('inventory.json fetch failed — relay-only mode'));
+
             NOSTR_RELAYS.forEach(relayUrl => {
                 advLog('Connecting to ' + relayUrl + '...');
                 let ws;
